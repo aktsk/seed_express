@@ -89,20 +89,20 @@ module SeedExpress
           end
 
           tmp_f.flush
-          @csv_values_with_header = CSV.read(tmp_f.path,
+          @csv_values_with_header = ::CSV.read(tmp_f.path,
+                                               {
+                                                 :headers => false,
+                                                 :converters => [],
+                                                 :encoding => "UTF-8",
+                                               })
+        end
+      else
+        @csv_values_with_header = ::CSV.read(file_name,
                                              {
                                                :headers => false,
                                                :converters => [],
                                                :encoding => "UTF-8",
                                              })
-        end
-      else
-        @csv_values_with_header = CSV.read(file_name,
-                                           {
-                                             :headers => false,
-                                             :converters => [],
-                                             :encoding => "UTF-8",
-                                           })
       end
 
       @csv_values_with_header
