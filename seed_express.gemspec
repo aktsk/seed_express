@@ -22,6 +22,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "bundler", "~> 1.3"
   spec.add_development_dependency "rake"
 
-  spec.requirements << "activerecord", "3.0.0"
-  spec.requirements << "active-import", "0.2.9"
+  spec.add_dependency("activerecord", ">= 3.0.0")
+  spec.add_dependency("active-import")
 end
