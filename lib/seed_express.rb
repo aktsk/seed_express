@@ -10,6 +10,7 @@ module SeedExpress
     attr_accessor :table_name
     attr_accessor :truncate_mode
     attr_accessor :nvl_mode
+    attr_accessor :datetime_offset
 
     DEFAULT_NVL_CONVERSIONS = {
       :integer => 0,
@@ -17,7 +18,7 @@ module SeedExpress
     }
 
     DEFAULT_CONVERSIONS = {
-      :datetime => ->(value) { Time.zone.parse(value) },
+      :datetime => ->(seed_express, value) {  Time.zone.parse(value) + seed_express.datetime_offset },
     }
 
     COMMENT_COLUMN_CHARACTER = '#'
@@ -44,6 +45,7 @@ module SeedExpress
 
       self.truncate_mode = options[:truncate_mode]
       self.nvl_mode = options[:nvl_mode]
+      self.datetime_offset = options[:datetime_offset] || 0
     end
 
     def file_name
@@ -193,7 +195,7 @@ module SeedExpress
       return nvl(column, value) if value.nil?
       conversion = DEFAULT_CONVERSIONS[columns[column].type]
       return value unless conversion
-      conversion.call(value)
+      conversion.call(self, value)
     end
 
     def nvl(column, value)
