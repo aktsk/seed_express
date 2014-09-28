@@ -193,7 +193,7 @@ module SeedExpress
 
     def convert_value(column, value)
       if value.nil?
-        return defaults_on_db[column] if defaults_on_db[column]
+        return defaults_on_db[column] if defaults_on_db.has_key?(column)
         return nvl(column, value)
       end
       conversion = DEFAULT_CONVERSIONS[columns[column].type]
@@ -205,7 +205,7 @@ module SeedExpress
       return @defaults_on_db if @defaults_on_db
       @defaults_on_db = {}
       klass.columns.each do |column|
-        if column.default
+        unless column.default.nil?
           @defaults_on_db[column.name.to_sym] = column.default
         end
       end
