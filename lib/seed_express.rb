@@ -192,10 +192,24 @@ module SeedExpress
     end
 
     def convert_value(column, value)
-      return nvl(column, value) if value.nil?
+      if value.nil?
+        return defaults_on_db[column] if defaults_on_db[column]
+        return nvl(column, value)
+      end
       conversion = DEFAULT_CONVERSIONS[columns[column].type]
       return value unless conversion
       conversion.call(self, value)
+    end
+
+    def defaults_on_db
+      return @defaults_on_db if @defaults_on_db
+      @defaults_on_db = {}
+      klass.columns.each do |column|
+        if column.default
+          @defaults_on_db[column.name.to_sym] = column.default
+        end
+      end
+      @defaults_on_db
     end
 
     def nvl(column, value)
