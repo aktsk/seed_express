@@ -12,6 +12,8 @@ module SeedExpress
     attr_accessor :nvl_mode
     attr_accessor :datetime_offset
 
+    @@table_to_klasses = nil
+
     DEFAULT_NVL_CONVERSIONS = {
       :integer => 0,
       :string => '',
@@ -26,13 +28,6 @@ module SeedExpress
     def initialize(table_name, path, options)
       @table_name = table_name
       @path = path
-
-      @table_to_klasses =
-        if options[:table_to_klasses]
-          options[:table_to_klasses]
-        else
-          {}
-        end
 
       @filter_each_lines =
         if options[:filter_each_lines]
@@ -54,7 +49,7 @@ module SeedExpress
 
     def klass
       return @klass if @klass
-      @klass = @table_to_klasses[@table_name]
+      @klass = self.class.table_to_klasses[@table_name]
       unless @klass
         @klass = @table_name.to_s.classify.constantize
       end
@@ -383,6 +378,18 @@ module SeedExpress
 
       SeedRecord.where(seed_table_id: seed_table.id,
                        record_id: waste_record_ids).delete_all
+    end
+
+    def self.table_to_klasses
+      return @@table_to_klasses if @@table_to_klasses
+
+      # Enables full of models
+      Find.find("#{Rails.root}/app/models") { |f| require f if /\.rb$/ === f }
+
+      table_to_klasses = ActiveRecord::Base.subclasses.
+        select { |klass| klass.respond_to?(:table_name) }.
+        flat_map { |klass| [klass.table_name.to_sym, klass] }
+      @table_to_klasses = Hash[*table_to_klasses]
     end
   end
 
