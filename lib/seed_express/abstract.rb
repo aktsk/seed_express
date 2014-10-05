@@ -7,6 +7,7 @@ class Abstract
   attr_accessor :truncate_mode
   attr_accessor :nvl_mode
   attr_accessor :datetime_offset
+  attr_accessor :callbacks
 
   @@table_to_klasses = nil
 
@@ -33,6 +34,12 @@ class Abstract
       end
 
     @filter_proc = options[:filter_proc]
+    default_callbacks = [:truncating, :reading_data, :deleting,
+                         :inserting, :inserting_a_part,
+                         :updating, :updating_a_part].flat_map do |v|
+      ["before_#{v}", "after_#{v}"].map(&:to_sym)
+    end.flat_map { |v| [v, Proc.new { |*args| } ] }
+    @callbacks = Hash[*default_callbacks].merge(options[:callbacks] || {})
 
     self.truncate_mode = options[:truncate_mode]
     self.nvl_mode = options[:nvl_mode]
@@ -66,8 +73,10 @@ class Abstract
   end
 
   def truncate_table
+    callbacks[:before_truncating].call
     klass.connection.execute("TRUNCATE TABLE #{klass.table_name};")
     SeedRecord.where(seed_table_id: seed_table.id).delete_all
+    callbacks[:after_truncating].call
   end
 
   def csv_values_with_header
@@ -104,6 +113,7 @@ class Abstract
   def csv_values
     return @csv_values if @csv_values
 
+    callbacks[:before_reading_data].call
     csv_rows = csv_values_with_header
     headers = csv_rows.shift.map(&:to_sym)
     auto_id = 1 unless headers.include?(:id)
@@ -131,6 +141,7 @@ class Abstract
       @csv_values << values if values
     end
 
+    callbacks[:after_reading_data].call(@csv_values.size)
     @csv_values
   end
 
@@ -240,9 +251,11 @@ class Abstract
     new_ids = csv_values.map { |value| value[:id] }
     delete_target_ids = existing_ids.keys - new_ids
     if delete_target_ids.present?
+      callbacks[:before_deleting].call(delete_target_ids.size)
       klass.where(id: delete_target_ids).delete_all
     end
 
+    callbacks[:after_deleting].call(delete_target_ids.size)
     delete_target_ids.size
   end
 
@@ -288,9 +301,12 @@ class Abstract
 
   def insert_records(records, digests)
     records_count = records.size
+    callbacks[:before_inserting].call(records_count)
     block_size = 1000
 
+    counter = 0
     while(records.present?) do
+      callbacks[:before_inserting_a_part].call(counter, records_count)
       targets = records.slice!(0, block_size)
       ActiveRecord::Base.transaction do
         # マスタ本体をアップデート
@@ -311,17 +327,23 @@ class Abstract
         end
         SeedRecord.import(bulk_records)
       end
+      counter += targets.size
+      callbacks[:after_inserting_a_part].call(counter, records_count)
     end
 
+    callbacks[:after_inserting].call(records_count)
     records_count
   end
 
   def update_records(records, digests)
     records_count = records.size
+    callbacks[:before_updating].call(records_count)
     actual_updating_count = 0
     block_size = 1000
 
+    counter = 0
     while(records.present?) do
+      callbacks[:before_updating_a_part].call(counter, records_count)
       targets = records.slice!(0, block_size)
       record_ids = targets.map { |target| target[:id] }
 
@@ -362,8 +384,11 @@ class Abstract
         end
         SeedRecord.import(bulk_seed_records)
       end
+      counter += targets.size
+      callbacks[:before_updating_a_part].call(counter, records_count)
     end
 
+    callbacks[:after_updating].call(records_count)
     return records_count, actual_updating_count
   end
 
