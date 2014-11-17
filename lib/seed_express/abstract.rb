@@ -1,6 +1,7 @@
 class Abstract
   require 'csv'
   require 'pp'
+  require 'msgpack'
   require 'tempfile'
 
   attr_accessor :table_name
