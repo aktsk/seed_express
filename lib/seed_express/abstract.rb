@@ -54,7 +54,7 @@ class Abstract
     return @klass if @klass
     @klass = self.class.table_to_klasses[@table_name]
     unless @klass
-      @klass = @table_name.to_s.classify.constantize
+      raise "#{@table_name} isn't able to convert to a class object"
     end
 
     @klass
@@ -62,8 +62,8 @@ class Abstract
 
   def seed_table
     return @seed_table if @seed_table
-    @seed_table = SeedTable.where(table_name: klass.table_name).first
-    @seed_table = SeedTable.create!(table_name: klass.table_name) unless @seed_table
+    @seed_table = SeedTable.where(table_name: @table_name).first
+    @seed_table = SeedTable.create!(table_name: @table_name) unless @seed_table
     @seed_table
   end
 
@@ -74,7 +74,7 @@ class Abstract
 
   def truncate_table
     callbacks[:before_truncating].call
-    klass.connection.execute("TRUNCATE TABLE #{klass.table_name};")
+    klass.connection.execute("TRUNCATE TABLE #{@table_name};")
     SeedRecord.where(seed_table_id: seed_table.id).delete_all
     callbacks[:after_truncating].call
   end
