@@ -24,4 +24,5 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency("activerecord", ">= 3.0.0")
   spec.add_dependency("activerecord-import")
+  spec.add_dependency("msgpack")
 end
