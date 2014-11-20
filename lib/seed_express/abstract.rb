@@ -381,7 +381,7 @@ class Abstract
               STDERR.puts "When id is #{model.id}: "
               STDERR.print model.errors.messages.pretty_inspect
             end
-            model.save!  # エラーを起こすことで強制終了する
+            model.save!
           end
 
           # SeedRecords をアップデート
