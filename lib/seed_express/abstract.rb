@@ -316,6 +316,14 @@ class Abstract
           attributes.each_pair do |column, value|
             model[column] = convert_value(column, value)
           end
+
+          unless model.valid?
+            puts
+            STDERR.puts "When id is #{model.id}: "
+            STDERR.print model.errors.messages.pretty_inspect
+            model.save!  # エラーを起こすことで強制終了する
+          end
+
           model
         end
         klass.import(bulk_records)
@@ -368,7 +376,12 @@ class Abstract
           end
           if model.changed?
             actual_updating_count += 1
-            model.save!
+            unless model.valid?
+              puts
+              STDERR.puts "When id is #{model.id}: "
+              STDERR.print model.errors.messages.pretty_inspect
+            end
+            model.save!  # エラーを起こすことで強制終了する
           end
 
           # SeedRecords をアップデート
