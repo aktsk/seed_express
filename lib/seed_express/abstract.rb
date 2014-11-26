@@ -38,7 +38,11 @@ class Abstract
     default_callback_proc = Proc.new { |*args| }
     default_callbacks = [:truncating, :reading_data, :deleting,
                          :inserting, :inserting_a_part,
-                         :updating, :updating_a_part].flat_map do |v|
+                         :updating, :updating_a_part,
+                         :updating_digests, :updating_a_part_of_digests,
+                         :inserting_digests, :inserting_a_part_of_digests,
+                         :making_bulk_digest_records, :making_a_part_of_bulk_digest_records,
+                        ].flat_map do |v|
       ["before_#{v}", "after_#{v}"].map(&:to_sym)
     end.flat_map { |v| [v, default_callback_proc ] }
     default_callbacks = Hash[*default_callbacks]
@@ -176,29 +180,28 @@ class Abstract
     deleted_ids = delete_missing_data
 
     # 新規登録対象と更新対象に分離
-    inserting_records,
-    inserting_digests,
-    updating_records,
-    updating_digests =
-      take_out_each_types_of_data_to_upload
+    inserting_records, updating_records, digests = take_out_each_types_of_data_to_upload
 
     # 新規登録するレコードを更新
-    inserted_ids = insert_records(inserting_records, inserting_digests)
+    inserted_ids = insert_records(inserting_records)
 
     # 更新するレコードを更新
-    updated_ids, actual_updated_ids = update_records(updating_records, updating_digests)
+    updated_ids, actual_updated_ids = update_records(updating_records)
 
     # 不要な digest を削除
     delete_waste_seed_records
-
-    # テーブルダイジェストを更新
-    seed_table.update_attributes!(:digest => table_digest)
 
     # コールバック呼び出し
     @callbacks[:after_importing].call(:inserted_ids       => inserted_ids,
                                       :updated_ids        => updated_ids,
                                       :actual_updated_ids => actual_updated_ids,
                                       :deleted_ids        => deleted_ids)
+
+    # ダイジェスト値の更新
+    update_digests(inserted_ids, updated_ids, digests)
+
+    # テーブルダイジェストを更新
+    seed_table.update_attributes!(:digest => table_digest)
 
     return :done, inserted_ids.size, updated_ids.size, actual_updated_ids.size, deleted_ids.size
   end
@@ -281,9 +284,8 @@ class Abstract
 
   def take_out_each_types_of_data_to_upload
     inserting_records = []
-    inserting_digests = {}
     updating_records = []
-    updating_digests = {}
+    digests = {}
 
     duplicate_ids = duplicate_ids(csv_values)
     if duplicate_ids.present?
@@ -297,18 +299,18 @@ class Abstract
       if existing_ids[id]
         if existing_digests[id] != digest
           updating_records << value
-          updating_digests[id] = digest
+          digests[id] = digest
         end
       else
         inserting_records << value
-        inserting_digests[id] = digest
+        digests[id] = digest
       end
     end
 
-    return inserting_records, inserting_digests, updating_records, updating_digests
+    return inserting_records, updating_records, digests
   end
 
-  def insert_records(records, digests)
+  def insert_records(records)
     records_count = records.size
     callbacks[:before_inserting].call(records_count)
     block_size = 1000
@@ -336,14 +338,6 @@ class Abstract
           model
         end
         klass.import(bulk_records)
-
-        # SeedRecords をアップデート
-        bulk_records = targets.map do |record|
-          SeedRecord.new(seed_table_id: seed_table.id,
-                         record_id:     record[:id],
-                         digest:        digests[record[:id]])
-        end
-        SeedRecord.import(bulk_records)
       end
       callbacks[:after_inserting_a_part].call(inserted_ids.size, records_count)
     end
@@ -352,7 +346,7 @@ class Abstract
     inserted_ids
   end
 
-  def update_records(records, digests)
+  def update_records(records)
     records_count = records.size
     callbacks[:before_updating].call(records_count)
     block_size = 1000
@@ -365,18 +359,9 @@ class Abstract
       record_ids = targets.map { |target| target[:id] }
 
       existing_records = klass.where(id: record_ids).index_by(&:id)
-      existing_digests = SeedRecord.where(seed_table_id: seed_table.id,
-                                          record_id: record_ids).index_by(&:record_id)
-
       ActiveRecord::Base.transaction do
         bulk_seed_records = []
         targets.each do |attributes|
-          #
-          # NOTE: ここでのダイジェスト値のチェックは不要
-          #       ダイジェストのチェックはあくまで処理開始前のアップデート済みレコードの切り捨てに使用する
-          #
-
-          # マスタ本体をアップデート
           id = attributes[:id]
           model = existing_records[id]
           attributes.each_pair do |column, value|
@@ -391,18 +376,6 @@ class Abstract
 
             model.save!  # エラーがある場合は、エラーを起こすことで強制終了する
             actual_updated_ids << id
-          end
-
-          # SeedRecords をアップデート
-          seed_record = existing_digests[id]
-          if seed_record
-            seed_record.digest = digests[id]
-            seed_record.save!
-
-          else
-            bulk_seed_records << SeedRecord.new(seed_table_id: seed_table.id,
-                                                record_id: id,
-                                                digest: digests[id])
           end
           updated_ids << id
         end
@@ -422,6 +395,63 @@ class Abstract
 
     SeedRecord.where(seed_table_id: seed_table.id,
                      record_id: waste_record_ids).delete_all
+  end
+
+  def update_digests(inserted_ids, updated_ids, digests)
+    tmp_updated_ids = updated_ids.dup
+    block_size = 1000
+    bulk_records = []
+    existing_digests = SeedRecord.where(seed_table_id: seed_table.id,
+                                        record_id: updated_ids).index_by(&:record_id)
+    counter = 0
+    callbacks[:before_updating_digests].call(counter, updated_ids.size)
+    while tmp_updated_ids.present?
+      callbacks[:before_updating_a_part_of_digests].call(counter, updated_ids.size)
+      targets = tmp_updated_ids.slice!(0, block_size)
+      targets.each do |id|
+        seed_record = existing_digests[id]
+        if seed_record
+          seed_record.digest = digests[id]
+          seed_record.save!
+        else
+          bulk_records << SeedRecord.new(seed_table_id: seed_table.id,
+                                         record_id:     id,
+                                         digest:        digests[id])
+        end
+      end
+      counter += targets.size
+      callbacks[:after_updating_a_part_of_digests].call(counter, updated_ids.size)
+    end
+    callbacks[:after_updating_digests].call(counter, updated_ids.size)
+
+    counter = 0
+    callbacks[:before_making_bulk_digest_records].call(0, inserted_ids.size)
+    inserted_ids.each do |id|
+      if counter % block_size == 0
+        callbacks[:before_making_a_part_of_bulk_digest_records].call(counter, inserted_ids.size)
+      end
+
+      bulk_records << SeedRecord.new(seed_table_id: seed_table.id,
+                                     record_id:     id,
+                                     digest:        digests[id])
+      counter += 1
+      if counter % block_size == 0
+        callbacks[:after_making_a_part_of_bulk_digest_records].call(counter, inserted_ids.size)
+      end
+    end
+    callbacks[:after_making_bulk_digest_records].call(inserted_ids.size, inserted_ids.size)
+
+    bulk_size = bulk_records.size
+    counter = 0
+    callbacks[:before_inserting_digests].call(counter, bulk_size)
+    while bulk_records.present?
+      callbacks[:before_inserting_a_part_of_digests].call(counter, bulk_size)
+      targets = bulk_records.slice!(0, block_size)
+      SeedRecord.import(targets)
+      counter += targets.size
+      callbacks[:after_inserting_a_part_of_digests].call(counter, bulk_size)
+    end
+    callbacks[:after_inserting_digests].call(counter, bulk_size)
   end
 
   def self.table_to_klasses
