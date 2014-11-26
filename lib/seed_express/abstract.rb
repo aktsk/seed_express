@@ -383,7 +383,6 @@ class Abstract
             model[column] = convert_value(column, value)
           end
           if model.changed?
-            actual_updating_count += 1
             unless model.valid?
               puts
               STDERR.puts "When id is #{model.id}: "
