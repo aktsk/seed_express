@@ -35,12 +35,17 @@ class Abstract
       end
 
     @filter_proc = options[:filter_proc]
+    default_callback_proc = Proc.new { |*args| }
     default_callbacks = [:truncating, :reading_data, :deleting,
                          :inserting, :inserting_a_part,
                          :updating, :updating_a_part].flat_map do |v|
       ["before_#{v}", "after_#{v}"].map(&:to_sym)
-    end.flat_map { |v| [v, Proc.new { |*args| } ] }
-    @callbacks = Hash[*default_callbacks].merge(options[:callbacks] || {})
+    end.flat_map { |v| [v, default_callback_proc ] }
+    default_callbacks = Hash[*default_callbacks]
+    [:after_importing].each do |v|
+      default_callbacks[v] = default_callback_proc
+    end
+    @callbacks = default_callbacks.merge(options[:callbacks] || {})
 
     self.truncate_mode = options[:truncate_mode]
     self.nvl_mode = options[:nvl_mode]
@@ -168,7 +173,7 @@ class Abstract
     end
 
     # 削除されるレコードを削除
-    deleted_count = delete_missing_data
+    deleted_ids = delete_missing_data
 
     # 新規登録対象と更新対象に分離
     inserting_records,
@@ -177,12 +182,11 @@ class Abstract
     updating_digests =
       take_out_each_types_of_data_to_upload
 
-
     # 新規登録するレコードを更新
-    inserted_count = insert_records(inserting_records, inserting_digests)
+    inserted_ids = insert_records(inserting_records, inserting_digests)
 
     # 更新するレコードを更新
-    updated_count, actual_updated_count = update_records(updating_records, updating_digests)
+    updated_ids, actual_updated_ids = update_records(updating_records, updating_digests)
 
     # 不要な digest を削除
     delete_waste_seed_records
@@ -190,8 +194,13 @@ class Abstract
     # テーブルダイジェストを更新
     seed_table.update_attributes!(:digest => table_digest)
 
+    # コールバック呼び出し
+    @callbacks[:after_importing].call(:inserted_ids       => inserted_ids,
+                                      :updated_ids        => updated_ids,
+                                      :actual_updated_ids => actual_updated_ids,
+                                      :deleted_ids        => deleted_ids)
 
-    return :done, inserted_count, updated_count, actual_updated_count, deleted_count
+    return :done, inserted_ids.size, updated_ids.size, actual_updated_ids.size, deleted_ids.size
   end
 
   def convert_value(column, value)
@@ -257,7 +266,7 @@ class Abstract
     end
 
     callbacks[:after_deleting].call(delete_target_ids.size)
-    delete_target_ids.size
+    delete_target_ids
   end
 
   def existing_digests
@@ -285,7 +294,6 @@ class Abstract
       id = value[:id]
       digest  = Digest::SHA1.hexdigest(MessagePack.pack(value))
 
-
       if existing_ids[id]
         if existing_digests[id] != digest
           updating_records << value
@@ -305,9 +313,9 @@ class Abstract
     callbacks[:before_inserting].call(records_count)
     block_size = 1000
 
-    counter = 0
+    inserted_ids = []
     while(records.present?) do
-      callbacks[:before_inserting_a_part].call(counter, records_count)
+      callbacks[:before_inserting_a_part].call(inserted_ids.size, records_count)
       targets = records.slice!(0, block_size)
       ActiveRecord::Base.transaction do
         # マスタ本体をアップデート
@@ -324,6 +332,7 @@ class Abstract
             model.save!  # エラーを起こすことで強制終了する
           end
 
+          inserted_ids << attributes[:id]
           model
         end
         klass.import(bulk_records)
@@ -336,23 +345,22 @@ class Abstract
         end
         SeedRecord.import(bulk_records)
       end
-      counter += targets.size
-      callbacks[:after_inserting_a_part].call(counter, records_count)
+      callbacks[:after_inserting_a_part].call(inserted_ids.size, records_count)
     end
 
-    callbacks[:after_inserting].call(records_count)
-    records_count
+    callbacks[:after_inserting].call(inserted_ids.size)
+    inserted_ids
   end
 
   def update_records(records, digests)
     records_count = records.size
     callbacks[:before_updating].call(records_count)
-    actual_updating_count = 0
     block_size = 1000
 
-    counter = 0
+    updated_ids = []
+    actual_updated_ids = []
     while(records.present?) do
-      callbacks[:before_updating_a_part].call(counter, records_count)
+      callbacks[:before_updating_a_part].call(updated_ids.size, records_count)
       targets = records.slice!(0, block_size)
       record_ids = targets.map { |target| target[:id] }
 
@@ -381,7 +389,9 @@ class Abstract
               STDERR.puts "When id is #{model.id}: "
               STDERR.print model.errors.messages.pretty_inspect
             end
-            model.save!
+
+            model.save!  # エラーがある場合は、エラーを起こすことで強制終了する
+            actual_updated_ids << id
           end
 
           # SeedRecords をアップデート
@@ -395,15 +405,15 @@ class Abstract
                                                 record_id: id,
                                                 digest: digests[id])
           end
+          updated_ids << id
         end
         SeedRecord.import(bulk_seed_records)
       end
-      counter += targets.size
-      callbacks[:before_updating_a_part].call(counter, records_count)
+      callbacks[:before_updating_a_part].call(updated_ids.size, records_count)
     end
 
-    callbacks[:after_updating].call(records_count)
-    return records_count, actual_updating_count
+    callbacks[:after_updating].call(updated_ids.size)
+    return updated_ids, actual_updated_ids
   end
 
   def delete_waste_seed_records
