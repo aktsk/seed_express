@@ -46,9 +46,6 @@ class Abstract
       ["before_#{v}", "after_#{v}"].map(&:to_sym)
     end.flat_map { |v| [v, default_callback_proc ] }
     default_callbacks = Hash[*default_callbacks]
-    [:after_importing].each do |v|
-      default_callbacks[v] = default_callback_proc
-    end
     @callbacks = default_callbacks.merge(options[:callbacks] || {})
 
     self.truncate_mode = options[:truncate_mode]
@@ -191,11 +188,11 @@ class Abstract
     # 不要な digest を削除
     delete_waste_seed_records
 
-    # コールバック呼び出し
-    @callbacks[:after_importing].call(:inserted_ids       => inserted_ids,
-                                      :updated_ids        => updated_ids,
-                                      :actual_updated_ids => actual_updated_ids,
-                                      :deleted_ids        => deleted_ids)
+    # 処理後の Validation
+    after_seed_express_validation(:inserted_ids       => inserted_ids,
+                                  :updated_ids        => updated_ids,
+                                  :actual_updated_ids => actual_updated_ids,
+                                  :deleted_ids        => deleted_ids)
 
     # ダイジェスト値の更新
     update_digests(inserted_ids, updated_ids, digests)
@@ -452,6 +449,16 @@ class Abstract
       callbacks[:after_inserting_a_part_of_digests].call(counter, bulk_size)
     end
     callbacks[:after_inserting_digests].call(counter, bulk_size)
+  end
+
+  def after_seed_express_validation(args)
+    return unless klass.respond_to?(:after_seed_express_validation)
+    errors = klass.after_seed_express_validation(args)
+    return if errors.blank?
+
+    STDOUT.puts
+    STDOUT.puts errors.pretty_inspect
+    raise ActiveRecord::StatementInvalid
   end
 
   def self.table_to_klasses
