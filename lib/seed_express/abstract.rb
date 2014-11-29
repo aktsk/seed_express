@@ -273,13 +273,12 @@ class Abstract
   end
 
   def existing_digests
-    return @existing_digests if @existing_digests
-    @existing_digests = {}
+    existing_digests = {}
     SeedRecord.where(seed_table_id: seed_table.id).map do |record|
-      @existing_digests[record.record_id] = record.digest
+      existing_digests[record.record_id] = record.digest
     end
 
-    @existing_digests
+    existing_digests
   end
 
   def take_out_each_types_of_data_to_upload
@@ -292,6 +291,7 @@ class Abstract
       raise "There are dupilcate ids. ({id=>num}: #{duplicate_ids.inspect})"
     end
 
+    existing_digests = self.existing_digests
     csv_values.each do |value|
       id = value[:id]
       digest  = Digest::SHA1.hexdigest(MessagePack.pack(value))
