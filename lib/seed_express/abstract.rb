@@ -470,6 +470,6 @@ class Abstract
     table_to_klasses = ActiveRecord::Base.subclasses.
       select { |klass| klass.respond_to?(:table_name) }.
       flat_map { |klass| [klass.table_name.to_sym, klass] }
-    @table_to_klasses = Hash[*table_to_klasses]
+    @@table_to_klasses = Hash[*table_to_klasses]
   end
 end
