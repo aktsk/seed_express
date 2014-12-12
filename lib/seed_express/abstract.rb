@@ -324,7 +324,7 @@ class Abstract
           unless model.valid?
             puts
             STDERR.puts "When id is #{model.id}: "
-            STDERR.print model.errors.messages.pretty_inspect
+            STDERR.print get_errors(model.errors).pretty_inspect
             model.save!  # エラーを起こすことで強制終了する
           end
 
@@ -365,7 +365,7 @@ class Abstract
             unless model.valid?
               puts
               STDERR.puts "When id is #{model.id}: "
-              STDERR.print model.errors.messages.pretty_inspect
+              STDERR.print get_errors(model.errors).pretty_inspect
             end
 
             model.save!  # エラーがある場合は、エラーを起こすことで強制終了する
@@ -468,5 +468,17 @@ class Abstract
       select { |klass| klass.respond_to?(:table_name) }.
       flat_map { |klass| [klass.table_name.to_sym, klass] }
     @@table_to_klasses = Hash[*table_to_klasses]
+  end
+
+  private
+
+  def raise_errors(errors)
+    ar_v = ActiveRecord::VERSION
+    if ([ar_v::MAJOR, ar_v::MINOR] <=> [3, 2]) < 0
+      # for less than ActiveRecord 3.2
+      errors
+    else
+      errors.messages
+    end
   end
 end
