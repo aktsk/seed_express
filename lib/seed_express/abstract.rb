@@ -18,10 +18,10 @@ class Abstract
   }
 
   DEFAULT_CONVERSIONS = {
-    :datetime => ->(seed_express, value) {  Time.zone.parse(value) + seed_express.datetime_offset },
+    :datetime => ->(seed_express, value) { Time.zone.parse(value) + seed_express.datetime_offset },
   }
 
-  COMMENT_COLUMN_CHARACTER = '#'
+  COMMENT_INITIAL_CHARACTER = '#'
 
   def initialize(table_name, path, options)
     @table_name = table_name
@@ -89,24 +89,21 @@ class Abstract
   def csv_values_with_header
     return @csv_values_with_header if @csv_values_with_header
     @csv_values_with_header = nil
-    if @filter_each_lines
-      Tempfile.open(table_name.to_s) do |tmp_f|
-        File.open(file_name) do |f|
-          f.each_line do |line|
-            tmp_f.puts @filter_each_lines.call(line)
-          end
-        end
 
-        tmp_f.flush
-        @csv_values_with_header = ::CSV.read(tmp_f.path,
-                                             {
-                                               :headers => false,
-                                               :converters => [],
-                                               :encoding => "UTF-8",
-                                             })
+    Tempfile.open(table_name.to_s) do |tmp_f|
+      File.open(file_name) do |f|
+        f.each_line do |line|
+          if @filter_each_lines
+            line = @filter_each_lines.call(line)
+          end
+
+          next if line[0] == COMMENT_INITIAL_CHARACTER
+          tmp_f.puts line
+        end
       end
-    else
-      @csv_values_with_header = ::CSV.read(file_name,
+
+      tmp_f.flush
+      @csv_values_with_header = ::CSV.read(tmp_f.path,
                                            {
                                              :headers => false,
                                              :converters => [],
@@ -138,7 +135,7 @@ class Abstract
 
       # Deletes comment columns
       values.delete_if do |k, v|
-        k.to_s[0] == COMMENT_COLUMN_CHARACTER
+        k.to_s[0] == COMMENT_INITIAL_CHARACTER
       end
 
       if @filter_proc
