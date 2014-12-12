@@ -472,12 +472,13 @@ class Abstract
 
   private
 
-  def raise_errors(errors)
+  def get_errors(errors)
     ar_v = ActiveRecord::VERSION
     if ([ar_v::MAJOR, ar_v::MINOR] <=> [3, 2]) < 0
-      # for less than ActiveRecord 3.2
+      # for older than ActiveRecord 3.2
       errors
     else
+      # for equal or newer than ActiveRecord 3.2
       errors.messages
     end
   end
