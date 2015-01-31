@@ -37,7 +37,8 @@ class Abstract
 
     @filter_proc = options[:filter_proc]
     default_callback_proc = Proc.new { |*args| }
-    default_callbacks = [:truncating, :reading_data, :deleting,
+    default_callbacks = [:truncating, :disabling_record_cache,
+                         :reading_data, :deleting,
                          :inserting, :inserting_a_part,
                          :updating, :updating_a_part,
                          :updating_digests, :updating_a_part_of_digests,
@@ -70,10 +71,7 @@ class Abstract
   end
 
   def seed_table
-    return @seed_table if @seed_table
-    @seed_table = SeedTable.where(table_name: @table_name).first
-    @seed_table = SeedTable.create!(table_name: @table_name) unless @seed_table
-    @seed_table
+    @seed_table ||= SeedTable.get_record(@table_name)
   end
 
   def table_digest
@@ -88,10 +86,10 @@ class Abstract
     callbacks[:after_truncating].call
   end
 
-  def disable_seed_records
-    callbacks[:before_disable_seed_records].call
-    SeedRecord.where(seed_table_id: seed_table.id).update_all(:digest => nil)
-    callbacks[:after_disable_seed_records].call
+  def disable_record_cache
+    callbacks[:before_disabling_record_cache].call
+    seed_table.disable_record_cache
+    callbacks[:after_disabling_record_cache].call
   end
 
   def csv_values_with_header
@@ -173,7 +171,7 @@ class Abstract
     if truncate_mode
       truncate_table
     elsif force_update_mode
-      disable_seed_records
+      disable_record_cache
     elsif seed_table.digest == table_digest
       # テーブルのダイジェスト値が同じ場合は処理をスキップする
       return :skipped
