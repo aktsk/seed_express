@@ -1,9 +1,9 @@
 class CreateSeedRecords < ActiveRecord::Migration
   def self.up
-    create_table :seed_records do |t|
-      t.references :seed_table, null: false
-      t.integer    :record_id,  null: false
-      t.string     :digest,     null: false
+    add_create_table :seed_records do |t|
+      t.references   :seed_table, null: false
+      t.integer      :record_id,  null: false
+      t.string       :digest,     null: true
       t.timestamps
     end
 
@@ -13,7 +13,5 @@ class CreateSeedRecords < ActiveRecord::Migration
 
   def self.down
     remove_table :seed_tables
-    remove_index :idx_seed_records_001
-    remove_index :idx_seed_records_002
   end
 end
