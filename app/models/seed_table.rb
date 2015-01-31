@@ -17,6 +17,9 @@ class SeedTable < ActiveRecord::Base
   end
 
   def disable_record_cache(ids = nil)
+    self.digest = nil
+    self.save!
+
     query = self.seed_records
     query = query.where(:record_id => ids) if ids
     query.update_all(:digest => nil)
