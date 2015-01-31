@@ -6,6 +6,7 @@ class Abstract
 
   attr_accessor :table_name
   attr_accessor :truncate_mode
+  attr_accessor :force_update_mode
   attr_accessor :nvl_mode
   attr_accessor :datetime_offset
   attr_accessor :callbacks
@@ -49,6 +50,7 @@ class Abstract
     @callbacks = default_callbacks.merge(options[:callbacks] || {})
 
     self.truncate_mode = options[:truncate_mode]
+    self.force_update_mode = options[:force_update_mode]
     self.nvl_mode = options[:nvl_mode]
     self.datetime_offset = options[:datetime_offset] || 0
   end
@@ -84,6 +86,12 @@ class Abstract
     klass.connection.execute("TRUNCATE TABLE #{@table_name};")
     SeedRecord.where(seed_table_id: seed_table.id).delete_all
     callbacks[:after_truncating].call
+  end
+
+  def disable_seed_records
+    callbacks[:before_disable_seed_records].call
+    SeedRecord.where(seed_table_id: seed_table.id).update_all(:digest => nil)
+    callbacks[:after_disable_seed_records].call
   end
 
   def csv_values_with_header
@@ -163,8 +171,9 @@ class Abstract
 
   def import_csv
     if truncate_mode
-      # 必要ならば、テーブルを truncate
       truncate_table
+    elsif force_update_mode
+      disable_seed_records
     elsif seed_table.digest == table_digest
       # テーブルのダイジェスト値が同じ場合は処理をスキップする
       return :skipped
