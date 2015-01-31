@@ -193,16 +193,20 @@ class Abstract
     delete_waste_seed_records
 
     # 処理後の Validation
-    after_seed_express_validation(:inserted_ids       => inserted_ids,
-                                  :updated_ids        => updated_ids,
-                                  :actual_updated_ids => actual_updated_ids,
-                                  :deleted_ids        => deleted_ids)
+    non_target_record_ids =
+      after_seed_express_validation(:inserted_ids       => inserted_ids,
+                                    :updated_ids        => updated_ids,
+                                    :actual_updated_ids => actual_updated_ids,
+                                    :deleted_ids        => deleted_ids)
 
     # ダイジェスト値の更新
-    update_digests(inserted_ids, updated_ids, digests)
+    update_digests(inserted_ids, updated_ids, digests, non_target_record_ids)
 
     # テーブルダイジェストを更新
-    seed_table.update_attributes!(:digest => table_digest)
+    # non_target_record_ids が存在する場合は、更新しない
+    if non_target_record_ids.blank?
+      seed_table.update_attributes!(:digest => table_digest)
+    end
 
     return :done, inserted_ids.size, updated_ids.size, actual_updated_ids.size, deleted_ids.size
   end
@@ -398,7 +402,10 @@ class Abstract
                      record_id: waste_record_ids).delete_all
   end
 
-  def update_digests(inserted_ids, updated_ids, digests)
+  def update_digests(inserted_ids, updated_ids, digests, non_target_record_ids)
+    inserted_ids -= non_target_record_ids
+    updated_ids -= non_target_record_ids
+
     tmp_updated_ids = updated_ids.dup
     block_size = 1000
     bulk_records = []
@@ -457,8 +464,9 @@ class Abstract
 
   def after_seed_express_validation(args)
     return unless klass.respond_to?(:after_seed_express_validation)
-    errors = klass.after_seed_express_validation(args)
-    return if errors.blank?
+    errors, non_target_record_ids = klass.after_seed_express_validation(args)
+    non_target_record_ids ||= []
+    return non_target_record_ids if errors.blank?
 
     STDOUT.puts
     STDOUT.puts errors.pretty_inspect
