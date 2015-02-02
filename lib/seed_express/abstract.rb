@@ -463,7 +463,8 @@ class Abstract
   end
 
   def after_seed_express_validation(args)
-    return unless klass.respond_to?(:after_seed_express_validation)
+    return [] unless klass.respond_to?(:after_seed_express_validation)
+
     errors, non_target_record_ids = klass.after_seed_express_validation(args)
     non_target_record_ids ||= []
     return non_target_record_ids if errors.blank?
