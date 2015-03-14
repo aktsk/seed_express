@@ -320,6 +320,7 @@ class Abstract
     callbacks[:before_inserting].call(records_count)
     block_size = 1000
 
+    existing_record_count = klass.count
     inserted_ids = []
     while(records.present?) do
       callbacks[:before_inserting_a_part].call(inserted_ids.size, records_count)
@@ -342,9 +343,13 @@ class Abstract
           inserted_ids << attributes[:id]
           model
         end
-        klass.import(bulk_records)
+        v = klass.import(bulk_records, :on_duplicate_key_update => [:id])
       end
       callbacks[:after_inserting_a_part].call(inserted_ids.size, records_count)
+    end
+
+    if klass.count != existing_record_count + records_count
+      raise "Inserting error has been detected. Maybe it's caused by duplicated key on not ID column."
     end
 
     callbacks[:after_inserting].call(inserted_ids.size)
@@ -370,7 +375,11 @@ class Abstract
           id = attributes[:id]
           model = existing_records[id]
           attributes.each_pair do |column, value|
+begin
             model[column] = convert_value(column, value)
+rescue => e
+binding.pry
+end
           end
           if model.changed?
             unless model.valid?
