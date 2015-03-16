@@ -375,11 +375,7 @@ class Abstract
           id = attributes[:id]
           model = existing_records[id]
           attributes.each_pair do |column, value|
-begin
             model[column] = convert_value(column, value)
-rescue => e
-binding.pry
-end
           end
           if model.changed?
             unless model.valid?
