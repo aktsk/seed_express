@@ -126,19 +126,11 @@ class Abstract
     callbacks[:before_reading_data].call
     csv_rows = csv_values_with_header
     headers = csv_rows.shift.map(&:to_sym)
-    auto_id = 1 unless headers.include?(:id)
 
     @csv_values = []
     csv_rows.map do |row|
       Hash[headers.zip(row)]
     end.each do |values|
-      if auto_id
-        values[:id] = auto_id
-        auto_id += 1
-      else
-        values[:id] = values[:id].to_i
-      end
-
       # Deletes comment columns
       values.delete_if do |k, v|
         k.to_s[0] == COMMENT_INITIAL_CHARACTER
