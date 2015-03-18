@@ -314,35 +314,38 @@ class Abstract
     callbacks[:before_inserting].call(records_count)
     block_size = 1000
 
-    existing_record_count = klass.count
+    existing_record_count =
+      ActiveRecord::Base.transaction { klass.count }  # To read from master server
+
     inserted_ids = []
     while(records.present?) do
       callbacks[:before_inserting_a_part].call(inserted_ids.size, records_count)
       targets = records.slice!(0, block_size)
-      ActiveRecord::Base.transaction do
-        # マスタ本体をアップデート
-        bulk_records = targets.map do |attributes|
-          model = klass.new
-          attributes.each_pair do |column, value|
-            model[column] = convert_value(column, value)
-          end
 
-          unless model.valid?
-            puts
-            STDERR.puts "When id is #{model.id}: "
-            STDERR.print get_errors(model.errors).pretty_inspect
-            model.save!  # エラーを起こすことで強制終了する
-          end
-
-          inserted_ids << attributes[:id]
-          model
+      # マスタ本体をアップデート
+      bulk_records = targets.map do |attributes|
+        model = klass.new
+        attributes.each_pair do |column, value|
+          model[column] = convert_value(column, value)
         end
-        v = klass.import(bulk_records, :on_duplicate_key_update => [:id])
+
+        unless model.valid?
+          puts
+          STDERR.puts "When id is #{model.id}: "
+          STDERR.print get_errors(model.errors).pretty_inspect
+          model.save!  # エラーを起こすことで強制終了する
+        end
+
+        inserted_ids << attributes[:id]
+        model
       end
+      v = klass.import(bulk_records, :on_duplicate_key_update => [:id])
       callbacks[:after_inserting_a_part].call(inserted_ids.size, records_count)
     end
 
-    if klass.count != existing_record_count + records_count
+    current_record_count =
+      ActiveRecord::Base.transaction { klass.count }  # To read from master server
+    if current_record_count != existing_record_count + records_count
       raise "Inserting error has been detected. Maybe it's caused by duplicated key on not ID column."
     end
 
