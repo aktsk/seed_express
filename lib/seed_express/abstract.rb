@@ -131,6 +131,8 @@ class Abstract
     csv_rows.map do |row|
       Hash[headers.zip(row)]
     end.each do |values|
+      values[:id] = values[:id].to_i
+
       # Deletes comment columns
       values.delete_if do |k, v|
         k.to_s[0] == COMMENT_INITIAL_CHARACTER
