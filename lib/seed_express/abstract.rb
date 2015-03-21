@@ -10,6 +10,7 @@ class Abstract
   attr_accessor :nvl_mode
   attr_accessor :datetime_offset
   attr_accessor :callbacks
+  attr_accessor :parent_validation
 
   @@table_to_klasses = nil
 
@@ -54,6 +55,7 @@ class Abstract
     self.force_update_mode = options[:force_update_mode]
     self.nvl_mode = options[:nvl_mode]
     self.datetime_offset = options[:datetime_offset] || 0
+    self.parent_validation = options[:parent_validation]
   end
 
   def file_name
@@ -192,6 +194,12 @@ class Abstract
                                     :updated_ids        => updated_ids,
                                     :actual_updated_ids => actual_updated_ids,
                                     :deleted_ids        => deleted_ids)
+
+    # 処理後の Validation 予約(親テーブルを更新)
+    update_parent_digest_to_validate(:inserted_ids       => inserted_ids,
+                                     :updated_ids        => updated_ids,
+                                     :actual_updated_ids => actual_updated_ids,
+                                     :deleted_ids        => deleted_ids)
 
     # ダイジェスト値の更新
     update_digests(inserted_ids, updated_ids, digests, non_target_record_ids)
@@ -499,5 +507,16 @@ class Abstract
       # for equal or newer than ActiveRecord 3.2
       errors.messages
     end
+  end
+
+  def update_parent_digest_to_validate(args)
+    return unless self.parent_validation
+    parent_table = self.parent_validation
+    parent_id_column = (parent_table.to_s.singularize + "_id").to_sym
+
+    parent_ids = klass.where(:id => args[:inserted_ids] + args[:updated_ids]).
+      select(parent_id_column).group(parent_id_column).map(&parent_id_column)
+
+    SeedTable.get_record(parent_table).disable_record_cache(parent_ids)
   end
 end
