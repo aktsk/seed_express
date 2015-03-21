@@ -419,24 +419,28 @@ class Abstract
     tmp_updated_ids = updated_ids.dup
     block_size = 1000
     bulk_records = []
+
     existing_digests = SeedRecord.where(seed_table_id: seed_table.id,
                                         record_id: updated_ids).index_by(&:record_id)
     counter = 0
     callbacks[:before_updating_digests].call(counter, updated_ids.size)
     while tmp_updated_ids.present?
       callbacks[:before_updating_a_part_of_digests].call(counter, updated_ids.size)
+      updating_records = []
       targets = tmp_updated_ids.slice!(0, block_size)
       targets.each do |id|
         seed_record = existing_digests[id]
         if seed_record
           seed_record.digest = digests[id]
-          seed_record.save!
+          updating_records << seed_record
         else
           bulk_records << SeedRecord.new(seed_table_id: seed_table.id,
                                          record_id:     id,
                                          digest:        digests[id])
         end
       end
+
+      bulk_update_digests(updating_records)
       counter += targets.size
       callbacks[:after_updating_a_part_of_digests].call(counter, updated_ids.size)
     end
@@ -518,5 +522,22 @@ class Abstract
       select(parent_id_column).group(parent_id_column).map(&parent_id_column)
 
     SeedTable.get_record(parent_table).disable_record_cache(parent_ids)
+  end
+
+  def bulk_update_digests(record)
+    ids = record.map(&:id).join(',')
+    digests = record.map { |v| "'#{v.digest}'"  }.join(',')
+    updated_at = "'" + Time.zone.now.utc.strftime('%Y-%m-%dT%H:%M:%S') + "'"
+
+    sql = <<-"EOF"
+      UPDATE seed_records
+      SET
+        updated_at = #{updated_at},
+        digest = ELT(FIELD(id, #{ids}), #{digests})
+      WHERE
+        id IN (#{ids})
+    EOF
+
+    ActiveRecord::Base.connection.execute(sql)
   end
 end
