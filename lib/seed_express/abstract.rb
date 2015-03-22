@@ -524,9 +524,11 @@ class Abstract
     SeedTable.get_record(parent_table).disable_record_cache(parent_ids)
   end
 
-  def bulk_update_digests(record)
-    ids = record.map(&:id).join(',')
-    digests = record.map { |v| "'#{v.digest}'"  }.join(',')
+  def bulk_update_digests(records)
+    return if records.empty?
+
+    ids = records.map(&:id).join(',')
+    digests = records.map { |v| "'#{v.digest}'"  }.join(',')
     updated_at = "'" + Time.zone.now.utc.strftime('%Y-%m-%dT%H:%M:%S') + "'"
 
     sql = <<-"EOF"
