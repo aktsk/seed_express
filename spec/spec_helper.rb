@@ -17,10 +17,8 @@ database_config = YAML.load(File.open(database_config_yaml).read)
 ActiveRecord::Base.establish_connection(database_config[Rails.env])
 
 # migrate schema
-[
- File.expand_path(File.join(File.dirname(__FILE__),  '/../db/migrate')),
- File.expand_path(File.join(File.dirname(__FILE__),  '/migrations')),
-].each do |path|
+['/../db/migrate', '/migrations'].each do |relative_path|
+  path = File.expand_path(File.join(File.dirname(__FILE__), relative_path))
   Dir.glob("#{path}/[0-9]*_*.rb").each do |file|
     version = file.sub(%r!^#{path}/!, '').sub(/_.*$/, '').to_i
     ActiveRecord::Migrator.run(:up, path, version)
@@ -36,7 +34,8 @@ Dir.glob("#{model_path}/*.rb").each do |model_file|
   require model_file
 end
 
-# This is settings for DatabaseCleaner
+# The followings are settings for DatabaseCleaner
+# I don't know why "config.use_transactional_fixtures = true" doesn't work
 RSpec.configure do |config|
   config.before(:suite) do
     DatabaseCleaner.clean_with(:truncation)
