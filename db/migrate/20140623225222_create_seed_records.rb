@@ -1,10 +1,10 @@
 class CreateSeedRecords < ActiveRecord::Migration
   def change
     create_table :seed_records do |t|
-      t.references   :seed_table, null: false
-      t.integer      :record_id,  null: false
-      t.string       :digest,     null: true
-      t.timestamps
+      t.references :seed_table, null: false
+      t.integer    :record_id,  null: false
+      t.string     :digest,     null: true
+      t.timestamps null: true
     end
 
     add_index :seed_records, [:seed_table_id], name: :idx_seed_records_001
