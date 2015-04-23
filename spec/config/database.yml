@@ -1,0 +1,17 @@
+development:
+  adapter: mysql   # "mysql2" doesn't work
+  database: test
+  username: root
+  password:
+  encoding: utf8
+  pool: 5
+  timeout: 5000
+
+test:
+  adapter: mysql   # "mysql2" doesn't work
+  database: test
+  username: root
+  password:
+  encoding: utf8
+  pool: 5
+  timeout: 5000
