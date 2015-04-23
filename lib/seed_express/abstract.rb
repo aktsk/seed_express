@@ -492,6 +492,7 @@ class Abstract
     return @@table_to_klasses if @@table_to_klasses
 
     # Enables full of models
+    require 'find'  # this is a temporary patch
     Find.find("#{Rails.root}/app/models") { |f| require f if /\.rb$/ === f }
 
     table_to_klasses = ActiveRecord::Base.subclasses.
