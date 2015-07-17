@@ -100,6 +100,7 @@ class Abstract
 
     Tempfile.open(table_name.to_s) do |tmp_f|
       File.open(file_name) do |f|
+        tmp_f.puts f.gets   # Ignores header line
         f.each_line do |line|
           if @filter_each_lines
             line = @filter_each_lines.call(line)
@@ -492,7 +493,6 @@ class Abstract
     return @@table_to_klasses if @@table_to_klasses
 
     # Enables full of models
-    require 'find'  # this is a temporary patch
     Find.find("#{Rails.root}/app/models") { |f| require f if /\.rb$/ === f }
 
     table_to_klasses = ActiveRecord::Base.subclasses.
