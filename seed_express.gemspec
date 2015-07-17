@@ -22,7 +22,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "bundler"
   spec.add_development_dependency "rake"
 
-  spec.add_dependency("rails", ">= 3.2.5")     # required by Railties
+  spec.add_dependency("rails", ">= 3.0.3")     # required by Railties
   spec.add_dependency("activerecord", ">= 3.0.0")
   spec.add_dependency("activerecord-import")
   spec.add_dependency("msgpack")
