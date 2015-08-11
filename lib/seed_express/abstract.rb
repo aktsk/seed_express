@@ -171,7 +171,7 @@ class Abstract
       disable_record_cache
     elsif seed_table.digest == table_digest
       # テーブルのダイジェスト値が同じ場合は処理をスキップする
-      return :skipped
+      return {:result => :skipped}
     end
 
     # 削除されるレコードを削除
@@ -181,16 +181,16 @@ class Abstract
     inserting_records, updating_records, digests = take_out_each_types_of_data_to_upload
 
     # 新規登録するレコードを更新
-    inserted_ids = insert_records(inserting_records)
+    inserted_ids, inserted_error = insert_records(inserting_records)
 
     # 更新するレコードを更新
-    updated_ids, actual_updated_ids = update_records(updating_records)
+    updated_ids, actual_updated_ids, updated_error = update_records(updating_records)
 
     # 不要な digest を削除
     delete_waste_seed_records
 
     # 処理後の Validation
-    non_target_record_ids =
+    after_seed_express_error =
       after_seed_express_validation(:inserted_ids       => inserted_ids,
                                     :updated_ids        => updated_ids,
                                     :actual_updated_ids => actual_updated_ids,
@@ -202,16 +202,24 @@ class Abstract
                                      :actual_updated_ids => actual_updated_ids,
                                      :deleted_ids        => deleted_ids)
 
-    # ダイジェスト値の更新
-    update_digests(inserted_ids, updated_ids, digests, non_target_record_ids)
+    has_an_error = inserted_error || updated_error || after_seed_express_error
+    unless has_an_error
+      # ダイジェスト値の更新
+      update_digests(inserted_ids, updated_ids, digests)
 
-    # テーブルダイジェストを更新
-    # non_target_record_ids が存在する場合は、更新しない
-    if non_target_record_ids.blank?
+      # テーブルダイジェストを更新
       seed_table.update_attributes!(:digest => table_digest)
     end
 
-    return :done, inserted_ids.size, updated_ids.size, actual_updated_ids.size, deleted_ids.size
+    result = has_an_error ? :error : :result
+
+    return {
+      :result               => result,
+      :inserted_count       => inserted_ids.size,
+      :updated_count        => updated_ids.size,
+      :actual_updated_count => actual_updated_ids.size,
+      :deleted_count        => deleted_ids.size
+    }
   end
 
   def convert_value(column, value)
@@ -319,6 +327,7 @@ class Abstract
   end
 
   def insert_records(records)
+    error = false
     records_count = records.size
     callbacks[:before_inserting].call(records_count)
     block_size = 1000
@@ -338,16 +347,17 @@ class Abstract
           model[column] = convert_value(column, value)
         end
 
-        unless model.valid?
-          puts
-          STDERR.puts "When id is #{model.id}: "
-          STDERR.print get_errors(model.errors).pretty_inspect
-          model.save!  # エラーを起こすことで強制終了する
+        if model.valid?
+          inserted_ids << attributes[:id]
+          model
+        else
+          STDOUT.puts
+          STDOUT.puts "When id is #{model.id}: "
+          STDOUT.print get_errors(model.errors).pretty_inspect
+          error = true
+          nil
         end
-
-        inserted_ids << attributes[:id]
-        model
-      end
+      end.compact
       v = klass.import(bulk_records, :on_duplicate_key_update => [:id])
       callbacks[:after_inserting_a_part].call(inserted_ids.size, records_count)
     end
@@ -355,14 +365,16 @@ class Abstract
     current_record_count =
       ActiveRecord::Base.transaction { klass.count }  # To read from master server
     if current_record_count != existing_record_count + records_count
-      raise "Inserting error has been detected. Maybe it's caused by duplicated key on not ID column."
+      "Inserting error has been detected. Maybe it's caused by duplicated key on not ID column."
+      raise
     end
 
     callbacks[:after_inserting].call(inserted_ids.size)
-    inserted_ids
+    return inserted_ids, error
   end
 
   def update_records(records)
+    error = false
     records_count = records.size
     callbacks[:before_updating].call(records_count)
     block_size = 1000
@@ -384,14 +396,15 @@ class Abstract
             model[column] = convert_value(column, value)
           end
           if model.changed?
-            unless model.valid?
-              puts
-              STDERR.puts "When id is #{model.id}: "
-              STDERR.print get_errors(model.errors).pretty_inspect
+            if model.valid?
+              model.save!
+              actual_updated_ids << id
+            else
+              STDOUT.puts
+              STDOUT.puts "When id is #{model.id}: "
+              STDOUT.print get_errors(model.errors).pretty_inspect
+              error = true
             end
-
-            model.save!  # エラーがある場合は、エラーを起こすことで強制終了する
-            actual_updated_ids << id
           end
           updated_ids << id
         end
@@ -401,7 +414,7 @@ class Abstract
     end
 
     callbacks[:after_updating].call(updated_ids.size)
-    return updated_ids, actual_updated_ids
+    return updated_ids, actual_updated_ids, error
   end
 
   def delete_waste_seed_records
@@ -413,10 +426,7 @@ class Abstract
                      record_id: waste_record_ids).delete_all
   end
 
-  def update_digests(inserted_ids, updated_ids, digests, non_target_record_ids)
-    inserted_ids -= non_target_record_ids
-    updated_ids -= non_target_record_ids
-
+  def update_digests(inserted_ids, updated_ids, digests)
     tmp_updated_ids = updated_ids.dup
     block_size = 1000
     bulk_records = []
@@ -478,15 +488,17 @@ class Abstract
   end
 
   def after_seed_express_validation(args)
-    return [] unless klass.respond_to?(:after_seed_express_validation)
+    return false unless klass.respond_to?(:after_seed_express_validation)
 
-    errors, non_target_record_ids = klass.after_seed_express_validation(args)
-    non_target_record_ids ||= []
-    return non_target_record_ids if errors.blank?
+    errors, = klass.after_seed_express_validation(args)
+    error = false
+    if errors.present?
+      STDOUT.puts
+      STDOUT.puts errors.pretty_inspect
+      error = true
+    end
 
-    STDOUT.puts
-    STDOUT.puts errors.pretty_inspect
-    raise ActiveRecord::StatementInvalid
+    return error
   end
 
   def self.table_to_klasses
