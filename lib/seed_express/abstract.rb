@@ -365,8 +365,7 @@ class Abstract
     current_record_count =
       ActiveRecord::Base.transaction { klass.count }  # To read from master server
     if current_record_count != existing_record_count + records_count
-      "Inserting error has been detected. Maybe it's caused by duplicated key on not ID column."
-      raise
+      raise "Inserting error has been detected. Maybe it's caused by duplicated key on not ID column. Try truncate mode."
     end
 
     callbacks[:after_inserting].call(inserted_ids.size)
