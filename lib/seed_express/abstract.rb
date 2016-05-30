@@ -1,9 +1,7 @@
 module SeedExpress
   class Abstract
-    require 'csv'
     require 'pp'
     require 'msgpack'
-    require 'tempfile'
 
     attr_accessor :table_name
     attr_accessor :truncate_mode
@@ -24,18 +22,9 @@ module SeedExpress
       :datetime => ->(seed_express, value) { Time.zone.parse(value) + seed_express.datetime_offset },
     }
 
-    COMMENT_INITIAL_CHARACTER = '#'
-
     def initialize(table_name, path, options)
       @table_name = table_name
       @path = path
-
-      @filter_each_lines =
-        if options[:filter_each_lines]
-          options[:filter_each_lines]
-        else
-          nil
-        end
 
       @filter_proc = options[:filter_proc]
       default_callback_proc = Proc.new { |*args| }
@@ -57,10 +46,6 @@ module SeedExpress
       self.nvl_mode = options[:nvl_mode]
       self.datetime_offset = options[:datetime_offset] || 0
       self.parent_validation = options[:parent_validation]
-    end
-
-    def file_name
-      @file_name ||= "#{@path}/#{table_name}.csv"
     end
 
     def klass
@@ -95,62 +80,8 @@ module SeedExpress
       callbacks[:after_disabling_record_cache].call
     end
 
-    def csv_values_with_header
-      return @csv_values_with_header if @csv_values_with_header
-      @csv_values_with_header = nil
-
-      Tempfile.open(table_name.to_s) do |tmp_f|
-        File.open(file_name) do |f|
-          tmp_f.puts f.gets   # Ignores header line
-          f.each_line do |line|
-            if @filter_each_lines
-              line = @filter_each_lines.call(line)
-            end
-
-            next if line[0] == COMMENT_INITIAL_CHARACTER
-            tmp_f.puts line
-          end
-        end
-
-        tmp_f.flush
-        @csv_values_with_header = ::CSV.read(tmp_f.path,
-                                             {
-                                               :headers => false,
-                                               :converters => [],
-                                               :encoding => "UTF-8",
-                                             })
-      end
-
-      @csv_values_with_header
-    end
-
-    def csv_values
-      return @csv_values if @csv_values
-
-      callbacks[:before_reading_data].call
-      csv_rows = csv_values_with_header
-      headers = csv_rows.shift.map(&:to_sym)
-
-      @csv_values = []
-      csv_rows.map do |row|
-        Hash[headers.zip(row)]
-      end.each do |values|
-        values[:id] = values[:id].to_i
-
-        # Deletes comment columns
-        values.delete_if do |k, v|
-          k.to_s[0] == COMMENT_INITIAL_CHARACTER
-        end
-
-        if @filter_proc
-          values = @filter_proc.call(values)
-        end
-
-        @csv_values << values if values
-      end
-
-      callbacks[:after_reading_data].call(@csv_values.size)
-      @csv_values
+    def in_records
+      raise "Please implements #in_records in each class"
     end
 
     def duplicate_ids(values)
@@ -278,7 +209,7 @@ module SeedExpress
     end
 
     def delete_missing_data
-      new_ids = csv_values.map { |value| value[:id] }
+      new_ids = in_records.map { |value| value[:id] }
       delete_target_ids = existing_ids.keys - new_ids
       if delete_target_ids.present?
         callbacks[:before_deleting].call(delete_target_ids.size)
@@ -303,13 +234,13 @@ module SeedExpress
       updating_records = []
       digests = {}
 
-      duplicate_ids = duplicate_ids(csv_values)
+      duplicate_ids = duplicate_ids(in_records)
       if duplicate_ids.present?
         raise "There are dupilcate ids. ({id=>num}: #{duplicate_ids.inspect})"
       end
 
       existing_digests = self.existing_digests
-      csv_values.each do |value|
+      in_records.each do |value|
         id = value[:id]
         digest  = Digest::SHA1.hexdigest(MessagePack.pack(value))
 
