@@ -96,7 +96,7 @@ module SeedExpress
       hash
     end
 
-    def import_csv
+    def import
       if truncate_mode
         truncate_table
       elsif force_update_mode

@@ -7,4 +7,5 @@ module SeedExpress
   Railtie
   autoload :Abstract, 'seed_express/abstract'
   autoload :CSV,      'seed_express/csv'
+  autoload :RubyHash, 'seed_express/rubyhash'
 end
