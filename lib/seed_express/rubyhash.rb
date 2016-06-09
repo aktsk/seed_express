@@ -9,7 +9,7 @@ module SeedExpress
       return @in_records if @in_records
       callbacks[:before_reading_data].call
 
-      # Rubocop say "The use of `eval` is a serious security risk",
+      # Rubocop says, "The use of `eval` is a serious security risk",
       # but that is not a risk because `eval` execute only a specified file
       @in_records = eval File.read file_name
 
