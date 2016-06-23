@@ -8,7 +8,7 @@ Gem::Specification.new do |spec|
   spec.version       = SeedExpress::VERSION
   spec.authors       = ["Toshiyuki Takaki"]
   spec.email         = ["ttakaki@aktsk.jp"]
-  spec.description   = %q{高速 Seed データ登録をします}
+  spec.description   = %q{更新されたレコードのみを対象とすることで、高速に Seed データ登録をします}
   spec.summary       = %q{高速 Seed データ登録}
   spec.homepage      = ""
   spec.license       = "MIT"
@@ -26,4 +26,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency("activerecord", ">= 3.0.0")
   spec.add_dependency("activerecord-import")
   spec.add_dependency("msgpack")
+  spec.add_dependency("memoist")
 end
