@@ -5,6 +5,7 @@ module SeedExpress
     require 'tempfile'
 
     COMMENT_INITIAL_CHARACTER = '#'
+    FILE_SUFFIX = 'csv'
 
     def initialize(table_name, path, options)
       @filter_each_lines =
@@ -17,20 +18,14 @@ module SeedExpress
       super
     end
 
-    def file_name
-      @file_name ||= "#{@path}/#{table_name}.csv"
-    end
-
-    def in_records
-      return @in_records if @in_records
-
+    def read_values_from(data)
       callbacks[:before_reading_data].call
-      csv_rows = csv_values_with_header
+      csv_rows = csv_values_with_header_from(data)
       headers = csv_rows.shift.map(&:to_sym)
 
-      @in_records = []
+      whole_values = []
       csv_rows.map do |row|
-        Hash[headers.zip(row)]
+        headers.zip(row).to_h
       end.each do |values|
         values[:id] = values[:id].to_i
 
@@ -43,42 +38,43 @@ module SeedExpress
           values = @filter_proc.call(values)
         end
 
-        @in_records << values if values
+        whole_values << values if values
       end
 
-      callbacks[:after_reading_data].call(@in_records.size)
-      @in_records
+      callbacks[:after_reading_data].call(whole_values.size)
+      whole_values
     end
 
     private
 
-    def csv_values_with_header
-      return @csv_values_with_header if @csv_values_with_header
-      @csv_values_with_header = nil
-
+    def csv_values_with_header_from(data)
+      values_with_header = nil
       Tempfile.open(table_name.to_s) do |tmp_f|
-        File.open(file_name) do |f|
-          tmp_f.puts f.gets   # Ignores header line
-          f.each_line do |line|
-            if @filter_each_lines
-              line = @filter_each_lines.call(line)
-            end
-
-            next if line[0] == COMMENT_INITIAL_CHARACTER
-            tmp_f.puts line
+        data.each_line.with_index do |line, i|
+          line.chomp!
+          if i == 0
+            tmp_f.puts line.chomp
+            next
           end
+
+          if @filter_each_lines
+            line = @filter_each_lines.call(line)
+          end
+
+          next if line[0] == COMMENT_INITIAL_CHARACTER
+          tmp_f.puts line
         end
 
         tmp_f.flush
-        @csv_values_with_header = ::CSV.read(tmp_f.path,
-                                             {
-                                               :headers => false,
-                                               :converters => [],
-                                               :encoding => "UTF-8",
-                                             })
+        values_with_header = ::CSV.read(tmp_f.path,
+                                        {
+                                          :headers => false,
+                                          :converters => [],
+                                          :encoding => "UTF-8",
+                                        })
       end
 
-      @csv_values_with_header
+      values_with_header
     end
   end
 end
