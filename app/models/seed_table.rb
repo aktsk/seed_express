@@ -1,27 +1,58 @@
 class SeedTable < ActiveRecord::Base
+  extend Memoist
+
+  attr_accessor :target_model
+  attr_accessor :reader
+
+  has_many :seed_parts
   has_many :seed_records
 
-  def self.get_record(object)
-    case object
-    when String
-      table_name = object
-    when Symbol
-      table_name = object.to_sym
-    when ActiveRecord::Base
-      table_name = object.class.table_name
-    when Class
-      table_name = object.table_name
+  def disable_record_digests(record_ids = nil)
+    query = self.seed_records
+    query = query.where(:record_id => record_ids) if record_ids
+    query.update_all(:digest => nil)
+
+    if record_ids.blank?
+      self.seed_parts.update_all(:digest => nil)
+      return
     end
 
-    self.where(:table_name => table_name).first || self.create!(table_name: table_name)
+    record_ids = record_ids.dup
+    deletions = {}
+    self.seed_parts.each do |seed_part|
+      range = seed_part.record_id_from .. seed_part.record_id_to
+      record_ids.delete_if do |record_id|
+        next false unless range.cover?(record_id)
+        deletions[seed_part.id] = true
+        true
+      end
+    end
+
+    SeedPart.where(:id => deletions.keys).update_all(:digest => nil)
   end
 
-  def disable_record_cache(ids = nil)
-    self.digest = nil
-    self.save!
+  def parts
+    files = SeedPart.part_files(self.reader.part_file_pattern) || SeedPart.files(self.reader.file_pattern)
+    raise "#{part_file_pattern} or #{file_pattern} do not exist." if files.blank?
 
-    query = self.seed_records
-    query = query.where(:record_id => ids) if ids
-    query.update_all(:digest => nil)
+    parts = self.seed_parts.index_by { |v| v.record_id_from .. v.record_id_to }
+    SeedExpress::Parts.new(self, files, parts)
+  end
+  memoize :parts
+
+  def truncate_digests
+    SeedPart.by_seed_table_id(self.id).delete_all
+    SeedRecord.by_seed_table_id(self.id).delete_all
+  end
+
+  class << self
+    def get_record(target_model)
+      table_name = target_model.table_name
+      record =
+        self.where(:table_name => table_name).first || self.create!(:table_name => table_name)
+
+      record.target_model = target_model
+      record
+    end
   end
 end
