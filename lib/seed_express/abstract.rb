@@ -1,9 +1,5 @@
 module SeedExpress
   class Abstract
-    require 'pp'
-    require 'msgpack'
-    require 'memoist'
-
     extend Memoist
 
     attr_accessor :table_name

@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 require 'rails'
+require 'pp'
+require 'msgpack'
+require 'memoist'
 require "seed_express/version"
 
 module SeedExpress
