@@ -32,7 +32,7 @@ module SeedExpress
           end
 
           def pluck_for_a_column(argv)
-            self.select(args).map { |record| record.send(argv) }
+            self.select(argv).map { |record| record.send(argv) }
           end
         end
       end
