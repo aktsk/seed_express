@@ -21,12 +21,18 @@ module SeedExpress
       def define_pluck
         ActiveRecord::Relation.class_eval do
           return if self.instance_methods.include?(:pluck)
-          def pluck
-            if Array === args
-              self.select(args).map { |v| args.map { |column| v.send(column) }}
-            else
-              self.select(args).map { |v| v.send(args) }
-            end
+          def pluck(args)
+            Enumerable === args ? pluck_for_columns(args) : pluck_for_a_column(args)
+          end
+
+          private
+
+          def pluck_for_columns(args)
+            self.select(args).map { |record| args.map { |column| record.send(column) } }
+          end
+
+          def pluck_for_a_column(argv)
+            self.select(args).map { |record| record.send(argv) }
           end
         end
       end
