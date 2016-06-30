@@ -138,96 +138,111 @@ Comming soon...
 
 ### Rake タスク
 
-    # -*- coding: utf-8 -*-
-    namespace :db do
-      desc "seed express  (params: TABLES=table1,table2,... FORCE_UPDATE_MODE=true|TRUNCATE_MODE=true)"
-      task :seed_express => :environment do
-        begin
-          target_csv_folder = "lib/tasks/csv"
+以下のような rake タスクが必要です。
+いずれ gem に取り込みます。
 
-          STDOUT.sync = true
+```ruby
+# -*- coding: utf-8 -*-
 
-          filter_tables(master_tables).each_pair do |table_name, options|
-            @showing_table = "%-36s ... " % table_name
-            STDOUT.print @showing_table
-            filter_each_lines = if options[:with_blanks]
-                                  filter_each_lines = ->(line) { line.chomp.gsub(/ *, */, ',') }
-                                else
-                                  nil
-                                end
+namespace :db do
+  desc "seed express  (params: TABLES=table1,table2,...  FORCE_UPDATE_MODE=true|TRUNCATE_MODE=true)"
+  task :seed_express => :environment do
+    begin
+      target_csv_folder = "lib/tasks/csv"
+      STDOUT.sync = true
 
-            options = options.dup
-            options[:filter_each_lines] = filter_each_lines
-            options[:truncate_mode] = true if ENV.has_key?('TRUNCATE_MODE')
-            options[:force_update_mode] = true if ENV.has_key?('FORCE_UPDATE_MODE')
-            options[:datetime_offset] = 9.hours
+      error = false
+      filter_tables(master_tables).each_pair do |table_name, options|
+        @showing_table = "%-36s ... " % table_name
+        STDOUT.print @showing_table
+        filter_each_lines = if options[:with_blanks]
+                              filter_each_lines = ->(line) { line.chomp.gsub(/ *, */, ',') }
+                            else
+                              nil
+                            end
 
-            inserting_lambda = lambda { |count, total| show_info("inserting: #{count}/#{total}") }
-            upating_lambda = lambda { |count, total| show_info("updating: #{count}/#{total}") }
-            upating_digests_lambda = lambda { |count, total| show_info("updating digests: #{count}/#{total}") }
-            making_bulk_digest_records_lambda = lambda { |count, total| show_info("making bulk digest records: #{count}/#{total}") }
-            inserting_digests_lambda = lambda { |count, total| show_info("inserting digests: #{count}/#{total}") }
+        options = options.dup
+        options[:filter_each_lines] = filter_each_lines
+        options[:truncate_mode] = true if ENV.has_key?('TRUNCATE_MODE')
+        options[:force_update_mode] = true if ENV.has_key?('FORCE_UPDATE_MODE')
+        options[:datetime_offset] = 9.hours
 
-            options[:callbacks] = {
-              :before_truncating => lambda { show_info("truncating") },
-              :before_reading_data => lambda { show_info("reading") },
-              :after_reading_data  => lambda { |count| show_info("read: #{count}") },
-              :before_deleting     => lambda { |count| show_info("deleting: #{count}") },
-              :after_deleting      => lambda { |count| show_info("deleted: #{count}") },
-              :before_inserting_a_part => inserting_lambda,
-              :after_inserting_a_part  => inserting_lambda,
-              :before_updating_a_part  => upating_lambda,
-              :after_updating_a_part   => upating_lambda,
-              :before_updating_digests           => upating_digests_lambda,
-              :before_updating_a_part_of_digests => upating_digests_lambda,
-              :after_updating_a_part_of_digests  => upating_digests_lambda,
-              :before_making_bulk_digest_records           => making_bulk_digest_records_lambda,
-              :before_making_a_part_of_bulk_digest_records => making_bulk_digest_records_lambda,
-              :after_making_a_part_of_bulk_digest_records  => making_bulk_digest_records_lambda,
-              :before_inserting_digests           => inserting_digests_lambda,
-              :before_inserting_a_part_of_digests => inserting_digests_lambda,
-              :after_inserting_a_part_of_digests  => inserting_digests_lambda,
-            }
+        inserting_lambda = ->(part_count, part_total, record_count, record_total) { show_info("[#{part_count}/#{part_total}] inserting: #{record_count}/#{record_total}") }
+        upating_lambda = ->(part_count, part_total, record_count, record_total)   { show_info("[#{part_count}/#{part_total}] updating: #{record_count}/#{record_total}") }
 
-            seed_express = SeedExpress::CSV.new(table_name, target_csv_folder, options)
+        making_bulk_digest_records_lambda = ->(record_count, record_total) { show_info("making bulk digest records: #{record_count}/#{record_total}") }
+        upating_digests_lambda = ->(record_count, record_total)            { show_info("updating digests: #{record_count}/#{record_total}") }
+        inserting_digests_lambda = ->(record_count, record_total)          { show_info("inserting digests: #{record_count}/#{record_total}") }
 
-            result,
-            inserted_count,
-            updated_count, actual_updated_count,
-            deleted_count = seed_express.import_csv
-            if result == :skipped
-              show_info("doesn't have any changes; skipped\n")
-            else
-              show_info("inserted: %5d, updated:(prediction: %5d, actual: %5d), deleted: %5d\n" %
-                        [inserted_count, updated_count, actual_updated_count, deleted_count])
-            end
+        options[:callbacks] = {
+          :before_truncating                           => -> { show_info("truncating") },
+          :before_reading_data                         => -> { show_info("reading") },
+          :after_reading_data                          => ->(count) { show_info("read: #{count}") },
+          :before_deleting                             => ->(count) { show_info("deleting: #{count}") },
+          :after_deleting                              => ->(count) { show_info("deleted: #{count}") },
+          :before_inserting_a_part                     => inserting_lambda,
+          :after_inserting_a_part                      => inserting_lambda,
+          :before_updating_a_part                      => upating_lambda,
+          :after_updating_a_part                       => upating_lambda,
+          :before_updating_digests                     => upating_digests_lambda,
+          :before_updating_a_part_of_digests           => upating_digests_lambda,
+          :after_updating_a_part_of_digests            => upating_digests_lambda,
+          :before_making_bulk_digest_records           => making_bulk_digest_records_lambda,
+          :before_making_a_part_of_bulk_digest_records => making_bulk_digest_records_lambda,
+          :after_making_a_part_of_bulk_digest_records  => making_bulk_digest_records_lambda,
+          :before_inserting_digests                    => inserting_digests_lambda,
+          :before_inserting_a_part_of_digests          => inserting_digests_lambda,
+          :after_inserting_a_part_of_digests           => inserting_digests_lambda,
+        }
+
+        seed_express = SeedExpress::CSV.new(table_name, target_csv_folder, options)
+          out = seed_express.import
+          case out[:result]
+          when :skipped
+            show_info("doesn't have any changes; skipped(elapsed time: %.2fsec.)\n" % out[:elapsed_time])
+          when :error
+            error = true
+            show_info("errors have been detected(elapsed time: %.2fsec.)\n" % out[:elapsed_time])
+          else
+            show_info("inserted: %5d, updated:(prediction: %5d, actual: %5d), deleted: %5d, elapsed time: %.2fsec.\n" %
+                      [
+                       out[:inserted_count],
+                       out[:updated_count], out[:actual_updated_count],
+                       out[:deleted_count],
+                       out[:elapsed_time],
+                      ])
           end
-        end
+      end
+      if error
+        raise "Errors have been detected on any tables"
       end
     end
+  end
+end
 
-    def show_info(msg)
-      reset_line = "\x0d\x1b[K"
-      STDOUT.print "#{reset_line}#{@showing_table}#{msg}"
-    end
+def show_info(msg)
+  reset_line = "\x0d\x1b[K"
+  STDOUT.print "#{reset_line}#{@showing_table}#{msg}"
+end
 
-    def master_tables
-      tables = nil
-      File.open('db/master_table_list.rb') do |f|
-        tables = eval(f.read)
-      end
+def master_tables
+  tables = nil
+  File.open('db/master_table_list.rb') do |f|
+    tables = eval(f.read)
+  end
 
-      tables
-    end
+  tables
+end
 
-    def filter_tables(master_tables)
-      tables = ENV['TABLES'] || ENV['TABLE']
-      return master_tables if tables.blank?
-      tables = tables.split(",").map(&:strip)
+def filter_tables(master_tables)
+  tables = ENV['TABLES'] || ENV['TABLE']
+  return master_tables if tables.blank?
+  tables = tables.split(",").map(&:strip)
 
-      hash = {}
-      tables.each do |table|
-        hash[table.to_sym] = master_tables[table.to_sym]
-      end
-      hash
-    end
+  hash = {}
+  tables.each do |table|
+    hash[table.to_sym] = master_tables[table.to_sym]
+  end
+  hash
+end
+```
