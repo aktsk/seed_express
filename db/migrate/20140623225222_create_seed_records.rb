@@ -7,7 +7,7 @@ class CreateSeedRecords < ActiveRecord::Migration
       t.timestamps null: true
     end
 
-    add_index :seed_records, [:seed_table_id], name: :idx_seed_records_001
-    add_index :seed_records, [:seed_table_id, :record_id], unique: true, name: :idx_seed_records_002
+    add_index :seed_records, [:seed_table_id], :name => :idx_seed_records_001
+    add_index :seed_records, [:seed_table_id, :record_id], :unique => true, :name => :idx_seed_records_002
   end
 end
