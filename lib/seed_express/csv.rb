@@ -76,9 +76,5 @@ module SeedExpress
 
       values_with_header
     end
-
-    def import_csv
-      import
-    end
   end
 end
