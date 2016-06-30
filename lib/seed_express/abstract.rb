@@ -99,6 +99,7 @@ module SeedExpress
 
     def import
       beginning_time = Time.zone.now
+
       if truncate_mode
         truncate_table
       elsif force_update_mode
