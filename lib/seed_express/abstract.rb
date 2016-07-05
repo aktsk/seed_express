@@ -9,12 +9,14 @@ module SeedExpress
     attr_accessor :datetime_offset
     attr_accessor :callbacks
     attr_accessor :parent_validation
+    attr_reader   :file_path
+
 
     def initialize(table_name, path, options)
       Supporters.regist!
 
       @table_name = table_name
-      @path = path
+      @file_path = path
 
       @filter_proc = options[:filter_proc]
       default_callback_proc = Proc.new { |*args| }
@@ -36,16 +38,6 @@ module SeedExpress
       self.datetime_offset = options[:datetime_offset] || 0
       self.parent_validation = options[:parent_validation]
     end
-
-    def file_pattern
-      "#{@path}/#{table_name}.#{self.class::FILE_SUFFIX}"
-    end
-    memoize :file_pattern
-
-    def part_file_pattern
-      "#{@path}/#{table_name}.*-*.#{self.class::FILE_SUFFIX}"
-    end
-    memoize :part_file_pattern
 
     def target_model
       unless v = self.class.table_to_klasses[@table_name]
