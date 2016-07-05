@@ -51,7 +51,7 @@ module SeedExpress
       unless v = self.class.table_to_klasses[@table_name]
         raise "#{@table_name} isn't able to convert to a class object"
       end
-      v.unscoped
+      v
     end
     memoize :target_model
 
