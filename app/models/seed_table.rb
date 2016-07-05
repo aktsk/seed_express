@@ -32,8 +32,16 @@ class SeedTable < ActiveRecord::Base
   end
 
   def parts
-    files = SeedPart.part_files(self.reader.part_file_pattern) || SeedPart.files(self.reader.file_pattern)
-    raise "#{part_file_pattern} or #{file_pattern} do not exist." if files.blank?
+    files = SeedPart.part_files(self.reader) || SeedPart.files(self.reader)
+    if files.blank?
+      file_path = self.reader.file_path
+      table_name = self.reader.table_name.to_s
+      suffix = self.reader.class::FILE_SUFFIX
+
+      part_file_path = "#{file_path}/**/#{table_name}.*-*.#{suffix}"
+      file_path = "#{file_path}/**/#{table_name}.#{suffix}"
+      raise "#{part_file_path} or #{file_path} do not exist."
+    end
 
     parts = self.seed_parts.index_by { |v| v.record_id_from .. v.record_id_to }
     SeedExpress::Parts.new(self, files, parts)
