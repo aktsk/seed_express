@@ -15,4 +15,5 @@ module SeedExpress
   autoload :Converter,  'seed_express/converter'
   autoload :File,       'seed_express/file'
   autoload :Supporters, 'seed_express/supporters'
+  autoload :RubyHash,   'seed_express/ruby_hash'
 end
