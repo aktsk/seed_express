@@ -80,10 +80,15 @@ class SeedPart < ActiveRecord::Base
       record
     end
 
-    def part_files(pattern)
+    def part_files(reader)
+      table_name = reader.table_name.to_s
+      suffix = reader.class::FILE_SUFFIX
+      pattern_for_glob = "#{reader.file_path}/**/#{reader.table_name}.*-*.#{suffix}"
+      pattern_for_regexp = %r!/#{table_name}\.([0-9]+)-([0-9]+)\.([^.]*\.)?#{suffix}$!i
+
       part_files = {}
-      Dir.glob(pattern).each do |file|
-        next unless %r!\.([0-9]+)-([0-9]+)\.csv$!i === file
+      Dir.glob(pattern_for_glob).each do |file|
+        next unless pattern_for_regexp === file
 
         id_from = $1.to_i
         id_to = $2.to_i
@@ -95,14 +100,20 @@ class SeedPart < ActiveRecord::Base
         part_files[id_range] = PART_INFO_STRUCT.new(id_range, file)
       end
 
-      part_files.present? ? part_files : nil
+      return nil if part_files.blank?
+      part_files.keys.sort_by(&:min).map { |k| [k, part_files[k]] }.to_h
     end
 
-    def files(pattern)
-      return nil unless File.exists?(pattern)
+    def files(reader)
+      table_name = reader.table_name.to_s
+      suffix = reader.class::FILE_SUFFIX
+      patterns_for_glob = ["#{reader.file_path}/**/#{reader.table_name}.#{suffix}",
+                           "#{reader.file_path}/**/#{reader.table_name}.*.#{suffix}"]
+      files = Dir.glob(patterns_for_glob)
+      return nil if files.blank?
 
       {
-        WHOLE_ID_RANGE => PART_INFO_STRUCT.new(WHOLE_ID_RANGE, pattern)
+        WHOLE_ID_RANGE => PART_INFO_STRUCT.new(WHOLE_ID_RANGE, files.first)
       }
     end
   end
