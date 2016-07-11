@@ -137,9 +137,7 @@ module SeedExpress
           inserted_ids << attributes[:id]
           record
         else
-          STDOUT.puts
-          STDOUT.puts "When id is #{record.id}: "
-          STDOUT.print get_errors(record.errors).pretty_inspect
+          show_each_validation_error(record)
           error = true
           nil
         end
@@ -188,9 +186,7 @@ module SeedExpress
               model.save!
               actual_updated_ids << id
             else
-              STDOUT.puts
-              STDOUT.puts "When id is #{model.id}: "
-              STDOUT.print get_errors(model.errors).pretty_inspect
+              show_each_validation_error(record)
               error = true
             end
           end
@@ -217,5 +213,22 @@ module SeedExpress
         by_seed_table_id(seed_table.id).
         by_record_id(waste_record_ids).delete_all
     end
+  end
+
+  def get_errors(errors)
+    ar_v = ActiveRecord::VERSION
+    if ([ar_v::MAJOR, ar_v::MINOR] <=> [3, 2]) < 0
+      # for older than ActiveRecord 3.2
+      errors
+    else
+      # for equal or newer than ActiveRecord 3.2
+      errors.messages
+    end
+  end
+
+  def show_each_validation_error(record)
+    STDOUT.puts
+    STDOUT.puts "When id is #{record.id}: "
+    STDOUT.print get_errors(record.errors).pretty_inspect
   end
 end
