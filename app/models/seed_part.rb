@@ -30,7 +30,7 @@ class SeedPart < ActiveRecord::Base
   memoize :new_ids
 
   def existing_ids
-    target_model.where(:id => (self.record_id_from .. self.record_id_to)).pluck(:id)
+    target_model.unscoped.where(:id => (self.record_id_from .. self.record_id_to)).pluck(:id)
   end
   memoize :existing_ids
 

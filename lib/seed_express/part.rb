@@ -52,7 +52,7 @@ module SeedExpress
       delete_target_ids = seed_part.existing_ids - seed_part.new_ids
       callbacks[:before_deleting].call(delete_target_ids.size)
       if delete_target_ids.present?
-        target_model.where(:id => delete_target_ids).delete_all
+        target_model.unscoped.where(:id => delete_target_ids).delete_all
       end
       callbacks[:after_deleting].call(delete_target_ids.size)
       delete_target_ids
@@ -102,7 +102,7 @@ module SeedExpress
       callbacks[:before_inserting].call(records_count)
 
       existing_record_count =
-        ActiveRecord::Base.transaction { target_model.count }  # To read certainly from master server
+        ActiveRecord::Base.transaction { target_model.unscoped.count }  # To read certainly from master server
 
       inserted_ids = []
       while(records.present?) do
@@ -115,7 +115,7 @@ module SeedExpress
       end
 
       current_record_count =
-        ActiveRecord::Base.transaction { target_model.count }  # To read certainly from master server
+        ActiveRecord::Base.transaction { target_model.unscoped.count }  # To read certainly from master server
       if current_record_count != existing_record_count + records_count
         raise "Inserting error has been detected. Maybe it's caused by duplicated key on not ID column. Try truncate mode."
       end
@@ -172,7 +172,7 @@ module SeedExpress
 
     def update_a_block_of_records(records)
       record_ids = records.map { |target| target[:id] }
-      existing_records = target_model.where(:id => record_ids).index_by(&:id)
+      existing_records = target_model.unscoped.where(:id => record_ids).index_by(&:id)
       error = false
       updated_ids = []
       actual_updated_ids = []
@@ -205,7 +205,7 @@ module SeedExpress
       seed_table = seed_part.seed_table
       range_of_ids = seed_part.record_id_from .. seed_part.record_id_to
 
-      master_record_ids = target_model.where(:id => range_of_ids).pluck(:id)
+      master_record_ids = target_model.unscoped.where(:id => range_of_ids).pluck(:id)
 
       seed_record_ids = SeedRecord.
         by_seed_table_id(seed_table.id).
