@@ -213,22 +213,22 @@ module SeedExpress
         by_seed_table_id(seed_table.id).
         by_record_id(waste_record_ids).delete_all
     end
-  end
 
-  def get_errors(errors)
-    ar_v = ActiveRecord::VERSION
-    if ([ar_v::MAJOR, ar_v::MINOR] <=> [3, 2]) < 0
-      # for older than ActiveRecord 3.2
-      errors
-    else
-      # for equal or newer than ActiveRecord 3.2
-      errors.messages
+    def get_errors(errors)
+      ar_v = ActiveRecord::VERSION
+      if ([ar_v::MAJOR, ar_v::MINOR] <=> [3, 2]) < 0
+        # for older than ActiveRecord 3.2
+        errors
+      else
+        # for equal or newer than ActiveRecord 3.2
+        errors.messages
+      end
     end
-  end
 
-  def show_each_validation_error(record)
-    STDOUT.puts
-    STDOUT.puts "When id is #{record.id}: "
-    STDOUT.print get_errors(record.errors).pretty_inspect
+    def show_each_validation_error(record)
+      STDOUT.puts
+      STDOUT.puts "When id is #{record.id}: "
+      STDOUT.print get_errors(record.errors).pretty_inspect
+    end
   end
 end
