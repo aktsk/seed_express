@@ -187,17 +187,6 @@ module SeedExpress
 
     private
 
-    def get_errors(errors)
-      ar_v = ActiveRecord::VERSION
-      if ([ar_v::MAJOR, ar_v::MINOR] <=> [3, 2]) < 0
-        # for older than ActiveRecord 3.2
-        errors
-      else
-        # for equal or newer than ActiveRecord 3.2
-        errors.messages
-      end
-    end
-
     def update_parent_digest_to_validate(args)
       return unless self.parent_validation
       parent_table = self.parent_validation

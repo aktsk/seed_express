@@ -101,9 +101,7 @@ module SeedExpress
       records_count = records.size
       callbacks[:before_inserting].call(records_count)
 
-      existing_record_count =
-        ActiveRecord::Base.transaction { target_model.unscoped.count }  # To read certainly from master server
-
+      existing_record_count = count_full_records
       inserted_ids = []
       while(records.present?) do
         callbacks[:before_inserting_a_part].call(part_count, part_total, inserted_ids.size, records_count)
@@ -114,8 +112,7 @@ module SeedExpress
         callbacks[:after_inserting_a_part].call(part_count, part_total, inserted_ids.size, records_count)
       end
 
-      current_record_count =
-        ActiveRecord::Base.transaction { target_model.unscoped.count }  # To read certainly from master server
+      current_record_count = count_full_records
       if current_record_count != existing_record_count + records_count
         raise "Inserting error has been detected. Maybe it's caused by duplicated key on not ID column. Try truncate mode."
       end
@@ -137,9 +134,7 @@ module SeedExpress
           inserted_ids << attributes[:id]
           record
         else
-          STDOUT.puts
-          STDOUT.puts "When id is #{record.id}: "
-          STDOUT.print get_errors(record.errors).pretty_inspect
+          show_each_validation_error(record)
           error = true
           nil
         end
@@ -188,9 +183,7 @@ module SeedExpress
               model.save!
               actual_updated_ids << id
             else
-              STDOUT.puts
-              STDOUT.puts "When id is #{model.id}: "
-              STDOUT.print get_errors(model.errors).pretty_inspect
+              show_each_validation_error(record)
               error = true
             end
           end
@@ -216,6 +209,27 @@ module SeedExpress
       SeedRecord.
         by_seed_table_id(seed_table.id).
         by_record_id(waste_record_ids).delete_all
+    end
+
+    def get_errors(errors)
+      ar_v = ActiveRecord::VERSION
+      if ([ar_v::MAJOR, ar_v::MINOR] <=> [3, 2]) < 0
+        # for older than ActiveRecord 3.2
+        errors
+      else
+        # for equal or newer than ActiveRecord 3.2
+        errors.messages
+      end
+    end
+
+    def show_each_validation_error(record)
+      STDOUT.puts
+      STDOUT.puts "When id is #{record.id}: "
+      STDOUT.print get_errors(record.errors).pretty_inspect
+    end
+
+    def count_full_records
+      ActiveRecord::Base.transaction { target_model.unscoped.count }  # To read certainly from master server
     end
   end
 end
