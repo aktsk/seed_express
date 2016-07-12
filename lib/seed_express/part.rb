@@ -101,9 +101,7 @@ module SeedExpress
       records_count = records.size
       callbacks[:before_inserting].call(records_count)
 
-      existing_record_count =
-        ActiveRecord::Base.transaction { target_model.unscoped.count }  # To read certainly from master server
-
+      existing_record_count = count_full_records
       inserted_ids = []
       while(records.present?) do
         callbacks[:before_inserting_a_part].call(part_count, part_total, inserted_ids.size, records_count)
@@ -114,8 +112,7 @@ module SeedExpress
         callbacks[:after_inserting_a_part].call(part_count, part_total, inserted_ids.size, records_count)
       end
 
-      current_record_count =
-        ActiveRecord::Base.transaction { target_model.unscoped.count }  # To read certainly from master server
+      current_record_count = count_full_records
       if current_record_count != existing_record_count + records_count
         raise "Inserting error has been detected. Maybe it's caused by duplicated key on not ID column. Try truncate mode."
       end
@@ -229,6 +226,10 @@ module SeedExpress
       STDOUT.puts
       STDOUT.puts "When id is #{record.id}: "
       STDOUT.print get_errors(record.errors).pretty_inspect
+    end
+
+    def count_full_records
+      ActiveRecord::Base.transaction { target_model.unscoped.count }  # To read certainly from master server
     end
   end
 end
