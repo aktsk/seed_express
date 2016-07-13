@@ -12,6 +12,8 @@ module SeedExpress
     attr_reader :part_total
     attr_reader :converters
 
+    include SeedExpress::Utilities
+
     def initialize(seed_part, converters, callbacks, part_count, part_total)
       @seed_part = seed_part
       @converters = converters
@@ -35,15 +37,24 @@ module SeedExpress
         categorize_each_types_of_data_to_upload
 
       # 新規登録するレコードを更新
-      inserted_ids, inserted_error = insert_records(inserting_records)
+      insert_results = insert_records(inserting_records)
 
       # 更新するレコードを更新
-      updated_ids, actual_updated_ids, updated_error = update_records(updating_records)
+      update_results = update_records(updating_records)
 
       # 不要な digest を削除
       delete_waste_seed_records
 
-      return digests, deleted_ids, inserted_ids, inserted_error, updated_ids, actual_updated_ids, updated_error
+      return {
+        :digests            => digests,
+        :deleted_ids        => deleted_ids,
+        :inserted_ids       => insert_results[:inserted_ids],
+        :inserted_error     => insert_results[:error],
+        :updated_ids        => update_results[:updated_ids],
+        :actual_updated_ids => update_results[:actual_updated_ids],
+        :updated_error      => update_results[:updated_error],
+        :parts_updated      => true,
+      }
     end
 
     private
@@ -97,19 +108,14 @@ module SeedExpress
     end
 
     def insert_records(records)
-      error = false
       records_count = records.size
       callbacks[:before_inserting].call(records_count)
 
       existing_record_count = count_full_records
-      inserted_ids = []
-      while(records.present?) do
-        callbacks[:before_inserting_a_part].call(part_count, part_total, inserted_ids.size, records_count)
-        targets = records.slice!(0, BLOCK_SIZE)
-        out_inserted_ids, out_error = insert_a_block_of_records(targets)
-        inserted_ids += out_inserted_ids
-        error |= out_error
-        callbacks[:after_inserting_a_part].call(part_count, part_total, inserted_ids.size, records_count)
+      results = {:inserted_ids => []}
+
+      do_each_block!(records, BLOCK_SIZE, :inserting_a_part) do |targets|
+        mix_results!(results, insert_a_block_of_records(targets))
       end
 
       current_record_count = count_full_records
@@ -117,8 +123,8 @@ module SeedExpress
         raise "Inserting error has been detected. Maybe it's caused by duplicated key on not ID column. Try truncate mode."
       end
 
-      callbacks[:after_inserting].call(inserted_ids.size)
-      return inserted_ids, error
+      callbacks[:after_inserting].call(results[:inserted_ids].size)
+      results
     end
 
     def insert_a_block_of_records(records)
@@ -141,28 +147,20 @@ module SeedExpress
       end.compact
 
       target_model.import(bulk_records)
-      return inserted_ids, error
+      return :inserted_ids => inserted_ids, :error => error
     end
 
     def update_records(records)
-      error = false
       records_count = records.size
       callbacks[:before_updating].call(records_count)
 
-      updated_ids = []
-      actual_updated_ids = []
-      while(records.present?) do
-        callbacks[:before_updating_a_part].call(part_count, part_total, updated_ids.size, records_count)
-        targets = records.slice!(0, BLOCK_SIZE)
-        out_updated_ids, out_actual_updated_ids, out_error = update_a_block_of_records(targets)
-        updated_ids += out_updated_ids
-        actual_updated_ids += out_actual_updated_ids
-        error |= out_error
-        callbacks[:before_updating_a_part].call(part_count, part_total, updated_ids.size, records_count)
+      results = {:updated_ids => [], :actual_updated_ids => []}
+      do_each_block!(records, BLOCK_SIZE, :updating_a_part) do |targets|
+        mix_results!(results, update_a_block_of_records(targets))
       end
 
-      callbacks[:after_updating].call(updated_ids.size)
-      return updated_ids, actual_updated_ids, error
+      callbacks[:after_updating].call(results[:updated_ids].size)
+      results
     end
 
     def update_a_block_of_records(records)
@@ -191,7 +189,7 @@ module SeedExpress
         end
       end
 
-      return updated_ids, actual_updated_ids, error
+      return {:updated_ids => updated_ids, :actual_updated_ids => actual_updated_ids, :error => error}
     end
 
     def delete_waste_seed_records

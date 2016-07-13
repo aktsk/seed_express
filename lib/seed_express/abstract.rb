@@ -11,6 +11,7 @@ module SeedExpress
     attr_accessor :parent_validation
     attr_reader   :file_path
 
+    include SeedExpress::Utilities
 
     def initialize(table_name, path, options)
       Supporters.regist!
@@ -98,48 +99,26 @@ module SeedExpress
         disable_digests
       end
 
-      digests = {}
-      deleted_ids = []
-      inserted_ids = []
-      inserted_error = false
-      updated_ids = []
-      actual_updated_ids = []
-      updated_error = false
-
       # パート毎に処理する
-      parts_updated = false
+      r = {}
       self.parts.each.with_index(1) do |part, i|
         next unless part.updated?
-        out_of_part = SeedExpress::Part.new(part, converters, callbacks, i, parts.size).import
-        digests.merge!(out_of_part[0])
-        deleted_ids        += out_of_part[1]
-        inserted_ids       += out_of_part[2]
-        inserted_error     |= out_of_part[3]
-        updated_ids        += out_of_part[4]
-        actual_updated_ids += out_of_part[5]
-        updated_error      |= out_of_part[6]
-        parts_updated = true
+        out_results = SeedExpress::Part.new(part, converters, callbacks, i, parts.size).import
+        mix_results!(r, out_results)
       end
 
-      return {:result => :skipped, :elapsed_time => Time.zone.now - beginning_time} unless parts_updated
+      return {:result => :skipped, :elapsed_time => Time.zone.now - beginning_time} unless r[:parts_updated]
 
       # 処理後の Validation
-      after_seed_express_error =
-        after_seed_express_validation(:inserted_ids       => inserted_ids,
-                                      :updated_ids        => updated_ids,
-                                      :actual_updated_ids => actual_updated_ids,
-                                      :deleted_ids        => deleted_ids)
+      after_seed_express_error = after_seed_express_validation(r)
 
       # 処理後の Validation 予約(親テーブルを更新)
-      update_parent_digest_to_validate(:inserted_ids       => inserted_ids,
-                                       :updated_ids        => updated_ids,
-                                       :actual_updated_ids => actual_updated_ids,
-                                       :deleted_ids        => deleted_ids)
+      update_parent_digest_to_validate(r)
 
-      has_an_error = inserted_error || updated_error || after_seed_express_error
+      has_an_error = r[:inserted_error] || r[:updated_error] || after_seed_express_error
       unless has_an_error
         ActiveRecord::Base.transaction do
-          seed_table.seed_records.renew_digests!(self, inserted_ids, updated_ids, digests)
+          seed_table.seed_records.renew_digests!(self, r[:inserted_ids], r[:updated_ids], r[:digests])
           self.parts.renew_digests!
         end
       end
@@ -149,10 +128,10 @@ module SeedExpress
 
       return {
         :result               => result,
-        :inserted_count       => inserted_ids.size,
-        :updated_count        => updated_ids.size,
-        :actual_updated_count => actual_updated_ids.size,
-        :deleted_count        => deleted_ids.size,
+        :inserted_count       => r[:inserted_ids].size,
+        :updated_count        => r[:updated_ids].size,
+        :actual_updated_count => r[:actual_updated_ids].size,
+        :deleted_count        => r[:deleted_ids].size,
         :elapsed_time         => elapsed_time,
       }
     end
@@ -161,14 +140,13 @@ module SeedExpress
       return false unless target_model.respond_to?(:after_seed_express_validation)
 
       errors, = target_model.after_seed_express_validation(args)
-      error = false
       if errors.present?
         STDOUT.puts
         STDOUT.puts errors.pretty_inspect
-        error = true
+        true
+      else
+        false
       end
-
-      return error
     end
 
     class << self

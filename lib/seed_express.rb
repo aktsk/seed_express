@@ -9,11 +9,12 @@ module SeedExpress
   autoload :Railtie,    'seed_express/railtie'
   Railtie
   autoload :Abstract,   'seed_express/abstract'
-  autoload :CSV,        'seed_express/csv'
   autoload :Parts,      'seed_express/parts'
   autoload :Part,       'seed_express/part'
   autoload :Converter,  'seed_express/converter'
   autoload :File,       'seed_express/file'
   autoload :Supporters, 'seed_express/supporters'
+  autoload :Utilities,  'seed_express/utilities'
+  autoload :CSV,        'seed_express/csv'
   autoload :RubyHash,   'seed_express/ruby_hash'
 end
