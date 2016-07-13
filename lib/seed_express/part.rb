@@ -114,13 +114,7 @@ module SeedExpress
       existing_record_count = count_full_records
       results = {:inserted_ids => []}
 
-      callback_info = {
-        :part_count => part_count,
-        :part_total => part_total,
-        :callback_name => :inserting_a_part
-      }
-
-      do_each_block!(records, BLOCK_SIZE, callback_info) do |targets|
+      do_each_block!(records, BLOCK_SIZE, :inserting_a_part) do |targets|
         mix_results!(results, insert_a_block_of_records(targets))
       end
 
@@ -160,14 +154,8 @@ module SeedExpress
       records_count = records.size
       callbacks[:before_updating].call(records_count)
 
-      callback_info = {
-        :part_count => part_count,
-        :part_total => part_total,
-        :callback_name => :updating_a_part
-      }
-
       results = {:updated_ids => [], :actual_updated_ids => []}
-      do_each_block!(records, BLOCK_SIZE, callback_info) do |targets|
+      do_each_block!(records, BLOCK_SIZE, :updating_a_part) do |targets|
         mix_results!(results, update_a_block_of_records(targets))
       end
 
