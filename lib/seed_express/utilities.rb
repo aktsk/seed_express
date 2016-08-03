@@ -16,19 +16,17 @@ module SeedExpress
 
     def do_each_block!(array, block_size, callback_name)
       processed_size = 0
-      array_size = array.size
       callback_before = "before_#{callback_name}".to_sym
       callback_after = "after_#{callback_name}".to_sym
       args_lambda =
         if self.respond_to?(:part_total)
-          -> { [self.part_count, self.part_total, processed_size, array_size] }
+          -> { [self.part_count, self.part_total, processed_size, array.size] }
         else
-          -> { [processed_size, array_size] }
+          -> { [processed_size, array.size] }
         end
 
-      while(array.present?)
+      array.each_slice(block_size) do |targets|
         callbacks[callback_before].call(*args_lambda.call)
-        targets = array.slice!(0, block_size)
         yield(targets)
         processed_size += targets.size
         callbacks[callback_after].call(*args_lambda.call)

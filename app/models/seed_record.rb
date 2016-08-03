@@ -22,16 +22,13 @@ class SeedRecord < ActiveRecord::Base
     private
 
     def update_digests!(seed_express, updated_ids, new_digests)
-      tmp_updated_ids = updated_ids.dup
       inserting_records = []
-
       existing_digests = self.all.index_by(&:record_id)
       counter = 0
       seed_express.callbacks[:before_updating_digests].call(counter, updated_ids.size)
-      while tmp_updated_ids.present?
+      updated_ids.each_slice(BLOCK_SIZE) do |targets|
         seed_express.callbacks[:before_updating_a_part_of_digests].call(counter, updated_ids.size)
         updating_records = []
-        targets = tmp_updated_ids.slice!(0, BLOCK_SIZE)
         targets.each do |id|
           seed_record = existing_digests[id]
           if seed_record
@@ -44,8 +41,7 @@ class SeedRecord < ActiveRecord::Base
         end
 
         bulk_update_digests!(updating_records)
-        counter += targets.size
-        seed_express.callbacks[:after_updating_a_part_of_digests].call(counter, updated_ids.size)
+        seed_express.callbacks[:after_updating_a_part_of_digests].call(counter += targets.size, updated_ids.size)
       end
 
       seed_express.callbacks[:after_updating_digests].call(counter, updated_ids.size)
@@ -77,15 +73,13 @@ class SeedRecord < ActiveRecord::Base
     def insert_digests!(seed_express, bulk_records)
       counter = 0
       bulk_records_count = bulk_records.size
-      seed_express.callbacks[:before_inserting_digests].call(counter, bulk_records_count)
-      while bulk_records.present?
-        seed_express.callbacks[:before_inserting_a_part_of_digests].call(counter, bulk_records_count)
-        targets = bulk_records.slice!(0, BLOCK_SIZE)
+      seed_express.callbacks[:before_inserting_digests].call(counter, bulk_records.size)
+      bulk_records.each_slice(BLOCK_SIZE) do |targets|
+        seed_express.callbacks[:before_inserting_a_part_of_digests].call(counter, bulk_records.size)
         SeedRecord.import(targets)
-        counter += targets.size
-        seed_express.callbacks[:after_inserting_a_part_of_digests].call(counter, bulk_records_count)
+        seed_express.callbacks[:after_inserting_a_part_of_digests].call(counter += targets.size, bulk_records.size)
       end
-      seed_express.callbacks[:after_inserting_digests].call(counter, bulk_records_count)
+      seed_express.callbacks[:after_inserting_digests].call(counter, bulk_records.size)
     end
 
     def bulk_update_digests!(records)
