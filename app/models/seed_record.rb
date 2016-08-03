@@ -22,17 +22,14 @@ class SeedRecord < ActiveRecord::Base
     private
 
     def update_digests!(seed_express, updated_ids, new_digests)
-      tmp_updated_ids = updated_ids.dup
       inserting_records = []
-
       existing_digests = self.all.index_by(&:record_id)
       counter = 0
       seed_express.callbacks[:before_updating_digests].call(counter, updated_ids.size)
-      while tmp_updated_ids.present?
+      updated_ids.each_slice(BLOCK_SIZE) do |part_of_updated_ids|
         seed_express.callbacks[:before_updating_a_part_of_digests].call(counter, updated_ids.size)
         updating_records = []
-        targets = tmp_updated_ids.slice!(0, BLOCK_SIZE)
-        targets.each do |id|
+        part_of_updated_ids.each do |id|
           seed_record = existing_digests[id]
           if seed_record
             seed_record.digest = new_digests[id]
@@ -44,7 +41,7 @@ class SeedRecord < ActiveRecord::Base
         end
 
         bulk_update_digests!(updating_records)
-        counter += targets.size
+        counter += part_of_updated_ids.size
         seed_express.callbacks[:after_updating_a_part_of_digests].call(counter, updated_ids.size)
       end
 
