@@ -26,10 +26,10 @@ class SeedRecord < ActiveRecord::Base
       existing_digests = self.all.index_by(&:record_id)
       counter = 0
       seed_express.callbacks[:before_updating_digests].call(counter, updated_ids.size)
-      updated_ids.each_slice(BLOCK_SIZE) do |part_of_updated_ids|
+      updated_ids.each_slice(BLOCK_SIZE) do |targets|
         seed_express.callbacks[:before_updating_a_part_of_digests].call(counter, updated_ids.size)
         updating_records = []
-        part_of_updated_ids.each do |id|
+        targets.each do |id|
           seed_record = existing_digests[id]
           if seed_record
             seed_record.digest = new_digests[id]
@@ -41,8 +41,7 @@ class SeedRecord < ActiveRecord::Base
         end
 
         bulk_update_digests!(updating_records)
-        counter += part_of_updated_ids.size
-        seed_express.callbacks[:after_updating_a_part_of_digests].call(counter, updated_ids.size)
+        seed_express.callbacks[:after_updating_a_part_of_digests].call(counter += targets.size, updated_ids.size)
       end
 
       seed_express.callbacks[:after_updating_digests].call(counter, updated_ids.size)
