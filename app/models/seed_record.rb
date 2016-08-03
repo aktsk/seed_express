@@ -10,24 +10,24 @@ class SeedRecord < ActiveRecord::Base
   }
 
   BLOCK_SIZE = 5000
-
   class << self
+    include SeedExpress::Utilities
+
     def renew_digests!(seed_express, inserted_ids, updated_ids, new_digests)
-      pending_records = update_digests!(seed_express, updated_ids, new_digests)
-      inserting_records = make_bulk_digest_records(seed_express, inserted_ids, new_digests)
-      insert_digests!(seed_express, inserting_records + pending_records)
+      @@callbacks = seed_express.callbacks
+      pending_records = update_digests!(updated_ids, new_digests)
+      inserting_records = make_bulk_digest_records(inserted_ids, new_digests)
+      insert_digests!(inserting_records + pending_records)
       delete_digests_out_of!(seed_express.parts)
     end
 
     private
 
-    def update_digests!(seed_express, updated_ids, new_digests)
+    def update_digests!(updated_ids, new_digests)
       inserting_records = []
       existing_digests = self.all.index_by(&:record_id)
-      counter = 0
-      seed_express.callbacks[:before_updating_digests].call(counter, updated_ids.size)
-      updated_ids.each_slice(BLOCK_SIZE) do |targets|
-        seed_express.callbacks[:before_updating_a_part_of_digests].call(counter, updated_ids.size)
+      callbacks[:before_updating_digests].call(0, updated_ids.size)
+      do_each_block!(updated_ids, BLOCK_SIZE, :updating_a_part_of_digests) do |targets|
         updating_records = []
         targets.each do |id|
           seed_record = existing_digests[id]
@@ -41,45 +41,31 @@ class SeedRecord < ActiveRecord::Base
         end
 
         bulk_update_digests!(updating_records)
-        seed_express.callbacks[:after_updating_a_part_of_digests].call(counter += targets.size, updated_ids.size)
       end
 
-      seed_express.callbacks[:after_updating_digests].call(counter, updated_ids.size)
+      callbacks[:after_updating_digests].call(updated_ids.size, updated_ids.size)
       inserting_records
     end
 
-    def make_bulk_digest_records(seed_express, inserted_ids, new_digests)
-      counter = 0
+    def make_bulk_digest_records(inserted_ids, new_digests)
       inserting_records = []
-      seed_express.callbacks[:before_making_bulk_digest_records].call(0, inserted_ids.size)
-      inserted_ids.each do |id|
-        if counter % BLOCK_SIZE == 0
-          seed_express.callbacks[:before_making_a_part_of_bulk_digest_records].call(counter, inserted_ids.size)
-        end
-
-        inserting_records <<
+      callbacks[:before_making_bulk_digest_records].call(0, inserted_ids.size)
+      do_each_block!(inserted_ids, BLOCK_SIZE, :making_a_part_of_bulk_digest_records) do |targets|
+        inserting_records += targets.map do |id|
           self.new(:record_id => id, :digest => new_digests[id])
-
-        counter += 1
-        if counter % BLOCK_SIZE == 0
-          seed_express.callbacks[:after_making_a_part_of_bulk_digest_records].call(counter, inserted_ids.size)
         end
       end
-
-      seed_express.callbacks[:after_making_bulk_digest_records].call(inserted_ids.size, inserted_ids.size)
+      callbacks[:after_making_bulk_digest_records].call(inserted_ids.size, inserted_ids.size)
       inserting_records
     end
 
-    def insert_digests!(seed_express, bulk_records)
-      counter = 0
+    def insert_digests!(bulk_records)
       bulk_records_count = bulk_records.size
-      seed_express.callbacks[:before_inserting_digests].call(counter, bulk_records.size)
-      bulk_records.each_slice(BLOCK_SIZE) do |targets|
-        seed_express.callbacks[:before_inserting_a_part_of_digests].call(counter, bulk_records.size)
+      callbacks[:before_inserting_digests].call(0, bulk_records.size)
+      do_each_block!(bulk_records, BLOCK_SIZE, :inserting_a_part_of_digests) do |targets|
         SeedRecord.import(targets)
-        seed_express.callbacks[:after_inserting_a_part_of_digests].call(counter += targets.size, bulk_records.size)
       end
-      seed_express.callbacks[:after_inserting_digests].call(counter, bulk_records.size)
+      callbacks[:after_inserting_digests].call(bulk_records.size, bulk_records.size)
     end
 
     def bulk_update_digests!(records)
@@ -103,6 +89,10 @@ class SeedRecord < ActiveRecord::Base
 
     def delete_digests_out_of!(parts)
       self.by_out_of_parts(parts).delete_all
+    end
+
+    def callbacks
+      @@callbacks
     end
   end
 end
