@@ -98,29 +98,24 @@ module SeedExpress
           disable_digests
         end
 
-        # パート毎に処理する
         r = {}
+        # パート毎に処理する
         import_parts(r)
         next {:result => :skipped} unless r[:parts_updated]
 
         # 処理後の Validation
-        after_seed_express_error = after_seed_express_validation(r)
+        after_seed_express_validation(r)
 
         # 処理後の Validation 予約(親テーブルを更新)
         update_parent_digest_to_validate(r)
 
-        has_an_error = r[:inserted_error] || r[:updated_error] || after_seed_express_error
-        unless has_an_error
-          ActiveRecord::Base.transaction do
-            seed_table.seed_records.renew_digests!(self, r[:inserted_ids], r[:updated_ids], r[:digests])
-            self.parts.renew_digests!
-          end
-        end
+        has_an_error = r[:inserted_error] || r[:updated_error] || r[:after_seed_express_error]
 
-        result = has_an_error ? :error : :result
+        # ダイジェストの更新
+        renew_digests(r, has_an_error)
 
         {
-          :result               => result,
+          :result               => has_an_error ? :error : :result,
           :inserted_count       => r[:inserted_ids].size,
           :updated_count        => r[:updated_ids].size,
           :actual_updated_count => r[:actual_updated_ids].size,
@@ -143,12 +138,22 @@ module SeedExpress
       return false unless target_model.respond_to?(:after_seed_express_validation)
 
       errors, = target_model.after_seed_express_validation(args)
-      if errors.present?
-        STDOUT.puts
-        STDOUT.puts errors.pretty_inspect
-        true
-      else
-        false
+      error = if errors.present?
+                STDOUT.puts
+                STDOUT.puts errors.pretty_inspect
+                true
+              else
+                false
+              end
+
+      args[:after_seed_express_error] = error
+    end
+
+    def renew_digests(r, has_an_error)
+      return if has_an_error
+      ActiveRecord::Base.transaction do
+        seed_table.seed_records.renew_digests!(self, r[:inserted_ids], r[:updated_ids], r[:digests])
+        self.parts.renew_digests!
       end
     end
 
