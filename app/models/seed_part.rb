@@ -109,7 +109,7 @@ class SeedPart < ActiveRecord::Base
 
     private
 
-    def each_part_file()
+    def each_part_file(file, pattern_for_regexp)
       return nil unless pattern_for_regexp === file
 
       id_from = $1.to_i
