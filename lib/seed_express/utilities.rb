@@ -14,7 +14,7 @@ module SeedExpress
       end
     end
 
-    def do_each_block!(array, block_size, whole_callback_name, block_callback_name)
+    def do_each_block(array, block_size, whole_callback_name, block_callback_name)
       processed_size = 0
       args_lambda =
         if self.respond_to?(:part_total)

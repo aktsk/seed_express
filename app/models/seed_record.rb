@@ -26,8 +26,8 @@ class SeedRecord < ActiveRecord::Base
     def update_digests!(updated_ids, new_digests)
       inserting_records = []
       existing_digests = self.all.index_by(&:record_id)
-      do_each_block!(updated_ids, BLOCK_SIZE,
-                     :updating_digests, :updating_a_part_of_digests) do |targets|
+      do_each_block(updated_ids, BLOCK_SIZE,
+                    :updating_digests, :updating_a_part_of_digests) do |targets|
         updating_records = []
         targets.each do |id|
           seed_record = existing_digests[id]
@@ -48,8 +48,8 @@ class SeedRecord < ActiveRecord::Base
 
     def make_bulk_digest_records(inserted_ids, new_digests)
       inserting_records = []
-      do_each_block!(inserted_ids, BLOCK_SIZE,
-                     :making_bulk_digest_records, :making_a_part_of_bulk_digest_records) do |targets|
+      do_each_block(inserted_ids, BLOCK_SIZE,
+                    :making_bulk_digest_records, :making_a_part_of_bulk_digest_records) do |targets|
         inserting_records += targets.map do |id|
           self.new(:record_id => id, :digest => new_digests[id])
         end
@@ -59,8 +59,8 @@ class SeedRecord < ActiveRecord::Base
 
     def insert_digests!(bulk_records)
       bulk_records_count = bulk_records.size
-      do_each_block!(bulk_records, BLOCK_SIZE,
-                     :inserting_digests, :inserting_a_part_of_digests) do |targets|
+      do_each_block(bulk_records, BLOCK_SIZE,
+                    :inserting_digests, :inserting_a_part_of_digests) do |targets|
         SeedRecord.import(targets)
       end
     end

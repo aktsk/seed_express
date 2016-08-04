@@ -111,7 +111,7 @@ module SeedExpress
       existing_record_count = count_full_records
       results = {:inserted_ids => []}
 
-      do_each_block!(records, BLOCK_SIZE, :inserting, :inserting_a_part) do |targets|
+      do_each_block(records, BLOCK_SIZE, :inserting, :inserting_a_part) do |targets|
         mix_results!(results, insert_a_block_of_records(targets))
       end
 
@@ -148,8 +148,8 @@ module SeedExpress
 
     def update_records(records)
       results = {:updated_ids => [], :actual_updated_ids => []}
-      do_each_block!(records, BLOCK_SIZE,
-                     :updating, :updating_a_part) do |targets|
+      do_each_block(records, BLOCK_SIZE,
+                    :updating, :updating_a_part) do |targets|
         mix_results!(results, update_a_block_of_records(targets))
       end
       results
