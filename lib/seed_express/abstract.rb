@@ -91,49 +91,46 @@ module SeedExpress
     end
 
     def import
-      beginning_time = Time.zone.now
-
-      if truncate_mode
-        truncate_table
-      elsif force_update_mode
-        disable_digests
-      end
-
-      # パート毎に処理する
-      r = {}
-      self.parts.each.with_index(1) do |part, i|
-        next unless part.updated?
-        out_results = SeedExpress::Part.new(part, converters, callbacks, i, parts.size).import
-        mix_results!(r, out_results)
-      end
-
-      return {:result => :skipped, :elapsed_time => Time.zone.now - beginning_time} unless r[:parts_updated]
-
-      # 処理後の Validation
-      after_seed_express_error = after_seed_express_validation(r)
-
-      # 処理後の Validation 予約(親テーブルを更新)
-      update_parent_digest_to_validate(r)
-
-      has_an_error = r[:inserted_error] || r[:updated_error] || after_seed_express_error
-      unless has_an_error
-        ActiveRecord::Base.transaction do
-          seed_table.seed_records.renew_digests!(self, r[:inserted_ids], r[:updated_ids], r[:digests])
-          self.parts.renew_digests!
+      with_elapsed_time do
+        if truncate_mode
+          truncate_table
+        elsif force_update_mode
+          disable_digests
         end
+
+        # パート毎に処理する
+        r = {}
+        self.parts.each.with_index(1) do |part, i|
+          next unless part.updated?
+          out_results = SeedExpress::Part.new(part, converters, callbacks, i, parts.size).import
+          mix_results!(r, out_results)
+        end
+        next {:result => :skipped} unless r[:parts_updated]
+
+        # 処理後の Validation
+        after_seed_express_error = after_seed_express_validation(r)
+
+        # 処理後の Validation 予約(親テーブルを更新)
+        update_parent_digest_to_validate(r)
+
+        has_an_error = r[:inserted_error] || r[:updated_error] || after_seed_express_error
+        unless has_an_error
+          ActiveRecord::Base.transaction do
+            seed_table.seed_records.renew_digests!(self, r[:inserted_ids], r[:updated_ids], r[:digests])
+            self.parts.renew_digests!
+          end
+        end
+
+        result = has_an_error ? :error : :result
+
+        {
+          :result               => result,
+          :inserted_count       => r[:inserted_ids].size,
+          :updated_count        => r[:updated_ids].size,
+          :actual_updated_count => r[:actual_updated_ids].size,
+          :deleted_count        => r[:deleted_ids].size,
+        }
       end
-
-      result = has_an_error ? :error : :result
-      elapsed_time = Time.zone.now - beginning_time
-
-      return {
-        :result               => result,
-        :inserted_count       => r[:inserted_ids].size,
-        :updated_count        => r[:updated_ids].size,
-        :actual_updated_count => r[:actual_updated_ids].size,
-        :deleted_count        => r[:deleted_ids].size,
-        :elapsed_time         => elapsed_time,
-      }
     end
 
     def after_seed_express_validation(args)
