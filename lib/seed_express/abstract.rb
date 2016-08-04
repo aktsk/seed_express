@@ -109,18 +109,10 @@ module SeedExpress
         # 処理後の Validation 予約(親テーブルを更新)
         update_parent_digest_to_validate(r)
 
-        has_an_error = r[:inserted_error] || r[:updated_error] || r[:after_seed_express_error]
-
         # ダイジェストの更新
-        renew_digests(r, has_an_error)
+        renew_digests(r, has_an_error?(r))
 
-        {
-          :result               => has_an_error ? :error : :result,
-          :inserted_count       => r[:inserted_ids].size,
-          :updated_count        => r[:updated_ids].size,
-          :actual_updated_count => r[:actual_updated_ids].size,
-          :deleted_count        => r[:deleted_ids].size,
-        }
+        format_results(r)
       end
     end
 
@@ -155,6 +147,20 @@ module SeedExpress
         seed_table.seed_records.renew_digests!(self, r[:inserted_ids], r[:updated_ids], r[:digests])
         self.parts.renew_digests!
       end
+    end
+
+    def has_an_error?(results)
+      results[:inserted_error] || results[:updated_error] || results[:after_seed_express_error]
+    end
+
+    def format_results(results)
+      {
+        :result               => has_an_error?(results) ? :error : :result,
+        :inserted_count       => results[:inserted_ids].size,
+        :updated_count        => results[:updated_ids].size,
+        :actual_updated_count => results[:actual_updated_ids].size,
+        :deleted_count        => results[:deleted_ids].size,
+      }
     end
 
     class << self
