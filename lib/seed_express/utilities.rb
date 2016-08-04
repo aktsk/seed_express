@@ -23,19 +23,34 @@ module SeedExpress
           -> { [processed_size, array.size] }
         end
 
+      whole_callback_before,
+      whole_callback_after,
+      block_callback_before,
+      block_callback_after =
+        callbacks_for_do_each_block(whole_callback_name, block_callback_name)
+
+      whole_callback_before.call(*args_lambda.call)
+      array.each_slice(block_size) do |targets|
+        block_callback_before.call(*args_lambda.call)
+        yield(targets)
+        processed_size += targets.size
+        block_callback_after.call(*args_lambda.call)
+      end
+      whole_callback_before.call(*args_lambda.call)
+    end
+
+    def callbacks_for_do_each_block(whole_callback_name, block_callback_name)
       whole_callback_before = "before_#{whole_callback_name}".to_sym
       whole_callback_after = "after_#{whole_callback_name}".to_sym
       block_callback_before = "before_#{block_callback_name}".to_sym
       block_callback_after = "after_#{block_callback_name}".to_sym
 
-      callbacks[whole_callback_before].call(*args_lambda.call)
-      array.each_slice(block_size) do |targets|
-        callbacks[block_callback_before].call(*args_lambda.call)
-        yield(targets)
-        processed_size += targets.size
-        callbacks[block_callback_after].call(*args_lambda.call)
-      end
-      callbacks[whole_callback_before].call(*args_lambda.call)
+      [
+       callbacks[whole_callback_before],
+       callbacks[whole_callback_after],
+       callbacks[block_callback_before],
+       callbacks[block_callback_after],
+      ]
     end
   end
 end
