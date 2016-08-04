@@ -157,35 +157,37 @@ module SeedExpress
 
     def update_a_block_of_records(records)
       existing_records = existing_records_by_id(records)
-      error = false
-      updated_ids = []
-      actual_updated_ids = []
+      results = {:updated_ids => [], :actual_updated_ids =>[], :error => false}
       ActiveRecord::Base.transaction do
-        records.each do |attributes|
-          id = attributes[:id]
-          model = existing_records[id]
-          attributes.each_pair do |column, value|
-            model[column] = converters.convert_value(column, value)
-          end
-          if model.changed?
-            if model.valid?
-              model.save!
-              actual_updated_ids << id
-            else
-              show_each_validation_error(record)
-              error = true
-            end
-          end
-          updated_ids << id
+        records.each do |record|
+          update_a_record!(record, existing_records, results)
         end
       end
 
-      return {:updated_ids => updated_ids, :actual_updated_ids => actual_updated_ids, :error => error}
+      results
     end
 
     def existing_records_by_id(records_from_file)
       record_ids = records_from_file.map { |target| target[:id] }
       target_model.unscoped.where(:id => record_ids).index_by(&:id)
+    end
+
+    def update_a_record!(record, existing_records, results)
+      id = record[:id]
+      model = existing_records[id]
+      record.each_pair do |column, value|
+        model[column] = converters.convert_value(column, value)
+      end
+      if model.changed?
+        if model.valid?
+          model.save!
+          results[:actual_updated_ids] << id
+        else
+          show_each_validation_error(model)
+          results[:error] = true
+        end
+      end
+      results[:updated_ids] << id
     end
 
     def delete_waste_seed_records
