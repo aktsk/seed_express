@@ -14,10 +14,8 @@ module SeedExpress
       end
     end
 
-    def do_each_block!(array, block_size, callback_name)
+    def do_each_block!(array, block_size, whole_callback_name, block_callback_name)
       processed_size = 0
-      callback_before = "before_#{callback_name}".to_sym
-      callback_after = "after_#{callback_name}".to_sym
       args_lambda =
         if self.respond_to?(:part_total)
           -> { [self.part_count, self.part_total, processed_size, array.size] }
@@ -25,12 +23,19 @@ module SeedExpress
           -> { [processed_size, array.size] }
         end
 
+      whole_callback_before = "before_#{whole_callback_name}".to_sym
+      whole_callback_after = "after_#{whole_callback_name}".to_sym
+      block_callback_before = "before_#{block_callback_name}".to_sym
+      block_callback_after = "after_#{block_callback_name}".to_sym
+
+      callbacks[whole_callback_before].call(*args_lambda.call)
       array.each_slice(block_size) do |targets|
-        callbacks[callback_before].call(*args_lambda.call)
+        callbacks[block_callback_before].call(*args_lambda.call)
         yield(targets)
         processed_size += targets.size
-        callbacks[callback_after].call(*args_lambda.call)
+        callbacks[block_callback_after].call(*args_lambda.call)
       end
+      callbacks[whole_callback_before].call(*args_lambda.call)
     end
   end
 end
