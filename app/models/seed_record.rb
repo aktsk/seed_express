@@ -71,12 +71,21 @@ class SeedRecord < ActiveRecord::Base
 
     def bulk_update_digests!(records)
       return if records.empty?
-      ActiveRecord::Base.connection.execute(build_update_query(records))
+      sql = build_update_query(records)
+      ActiveRecord::Base.connection.execute(sql)
+    end
+
+    def update_query_of_ids(records)
+      records.map(&:id).join(',')
+    end
+
+    def update_query_of_digests(records)
+      records.map { |v| "'#{v.digest}'"  }.join(',')
     end
 
     def build_update_query(records)
-      ids = records.map(&:id).join(',')
-      digests = records.map { |v| "'#{v.digest}'"  }.join(',')
+      ids = update_query_of_ids(records)
+      digests = update_query_of_digests(records)
 
       <<-"EOF"
         UPDATE seed_records
