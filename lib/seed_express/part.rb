@@ -156,8 +156,7 @@ module SeedExpress
     end
 
     def update_a_block_of_records(records)
-      record_ids = records.map { |target| target[:id] }
-      existing_records = target_model.unscoped.where(:id => record_ids).index_by(&:id)
+      existing_records = existing_records_by_id(records)
       error = false
       updated_ids = []
       actual_updated_ids = []
@@ -182,6 +181,11 @@ module SeedExpress
       end
 
       return {:updated_ids => updated_ids, :actual_updated_ids => actual_updated_ids, :error => error}
+    end
+
+    def existing_records_by_id(records_from_file)
+      record_ids = records_from_file.map { |target| target[:id] }
+      target_model.unscoped.where(:id => record_ids).index_by(&:id)
     end
 
     def delete_waste_seed_records
