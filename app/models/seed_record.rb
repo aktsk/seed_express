@@ -26,8 +26,8 @@ class SeedRecord < ActiveRecord::Base
     def update_digests!(updated_ids, new_digests)
       inserting_records = []
       existing_digests = self.all.index_by(&:record_id)
-      callbacks[:before_updating_digests].call(0, updated_ids.size)
-      do_each_block!(updated_ids, BLOCK_SIZE, :updating_a_part_of_digests) do |targets|
+      do_each_block(updated_ids, BLOCK_SIZE,
+                    :updating_digests, :updating_a_part_of_digests) do |targets|
         updating_records = []
         targets.each do |id|
           seed_record = existing_digests[id]
@@ -43,29 +43,26 @@ class SeedRecord < ActiveRecord::Base
         bulk_update_digests!(updating_records)
       end
 
-      callbacks[:after_updating_digests].call(updated_ids.size, updated_ids.size)
       inserting_records
     end
 
     def make_bulk_digest_records(inserted_ids, new_digests)
       inserting_records = []
-      callbacks[:before_making_bulk_digest_records].call(0, inserted_ids.size)
-      do_each_block!(inserted_ids, BLOCK_SIZE, :making_a_part_of_bulk_digest_records) do |targets|
+      do_each_block(inserted_ids, BLOCK_SIZE,
+                    :making_bulk_digest_records, :making_a_part_of_bulk_digest_records) do |targets|
         inserting_records += targets.map do |id|
           self.new(:record_id => id, :digest => new_digests[id])
         end
       end
-      callbacks[:after_making_bulk_digest_records].call(inserted_ids.size, inserted_ids.size)
       inserting_records
     end
 
     def insert_digests!(bulk_records)
       bulk_records_count = bulk_records.size
-      callbacks[:before_inserting_digests].call(0, bulk_records.size)
-      do_each_block!(bulk_records, BLOCK_SIZE, :inserting_a_part_of_digests) do |targets|
+      do_each_block(bulk_records, BLOCK_SIZE,
+                    :inserting_digests, :inserting_a_part_of_digests) do |targets|
         SeedRecord.import(targets)
       end
-      callbacks[:after_inserting_digests].call(bulk_records.size, bulk_records.size)
     end
 
     def bulk_update_digests!(records)

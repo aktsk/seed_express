@@ -108,22 +108,18 @@ module SeedExpress
     end
 
     def insert_records(records)
-      records_count = records.size
-      callbacks[:before_inserting].call(records_count)
-
       existing_record_count = count_full_records
       results = {:inserted_ids => []}
 
-      do_each_block!(records, BLOCK_SIZE, :inserting_a_part) do |targets|
+      do_each_block(records, BLOCK_SIZE, :inserting, :inserting_a_part) do |targets|
         mix_results!(results, insert_a_block_of_records(targets))
       end
 
       current_record_count = count_full_records
-      if current_record_count != existing_record_count + records_count
+      if current_record_count != existing_record_count + records.size
         raise "Inserting error has been detected. Maybe it's caused by duplicated key on not ID column. Try truncate mode."
       end
 
-      callbacks[:after_inserting].call(results[:inserted_ids].size)
       results
     end
 
@@ -151,15 +147,11 @@ module SeedExpress
     end
 
     def update_records(records)
-      records_count = records.size
-      callbacks[:before_updating].call(records_count)
-
       results = {:updated_ids => [], :actual_updated_ids => []}
-      do_each_block!(records, BLOCK_SIZE, :updating_a_part) do |targets|
+      do_each_block(records, BLOCK_SIZE,
+                    :updating, :updating_a_part) do |targets|
         mix_results!(results, update_a_block_of_records(targets))
       end
-
-      callbacks[:after_updating].call(results[:updated_ids].size)
       results
     end
 
