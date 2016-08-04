@@ -23,23 +23,11 @@ module SeedExpress
       csv_rows = csv_values_with_header_from(data)
       headers = csv_rows.shift.map(&:to_sym)
 
-      whole_values = []
-      csv_rows.map do |row|
+      whole_values = csv_rows.map do |row|
         headers.zip(row).to_h
-      end.each do |values|
-        values[:id] = values[:id].to_i
-
-        # Deletes comment columns
-        values.delete_if do |k, v|
-          k.to_s[0] == COMMENT_INITIAL_CHARACTER
-        end
-
-        if @filter_proc
-          values = @filter_proc.call(values)
-        end
-
-        whole_values << values if values
-      end
+      end.map do |record|
+        setup_each_record(record)
+      end.compact
 
       callbacks[:after_reading_data].call(whole_values.size)
       whole_values
@@ -75,6 +63,18 @@ module SeedExpress
       end
 
       values_with_header
+    end
+
+    def setup_each_record(record)
+      record[:id] = record[:id].to_i
+
+      # Deletes comment columns
+      record.delete_if do |k, v|
+        k.to_s[0] == COMMENT_INITIAL_CHARACTER
+      end
+
+      record = @filter_proc.call(record) if @filter_proc
+      record
     end
   end
 end
