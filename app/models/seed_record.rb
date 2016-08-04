@@ -71,21 +71,21 @@ class SeedRecord < ActiveRecord::Base
 
     def bulk_update_digests!(records)
       return if records.empty?
+      ActiveRecord::Base.connection.execute(build_update_query(records))
+    end
 
+    def build_update_query(records)
       ids = records.map(&:id).join(',')
       digests = records.map { |v| "'#{v.digest}'"  }.join(',')
-      updated_at = "'" + Time.zone.now.utc.strftime('%Y-%m-%dT%H:%M:%S') + "'"
 
-      sql = <<-"EOF"
+      <<-"EOF"
         UPDATE seed_records
         SET
-          updated_at = #{updated_at},
+          updated_at = '#{Time.zone.now.utc.iso8601}',
           digest = ELT(FIELD(id, #{ids}), #{digests})
         WHERE
           id IN (#{ids})
       EOF
-
-      ActiveRecord::Base.connection.execute(sql)
     end
 
     def delete_digests_out_of!(parts)
