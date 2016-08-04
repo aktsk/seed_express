@@ -14,6 +14,13 @@ module SeedExpress
       end
     end
 
+    def with_elapsed_time
+      beginning_time = Time.zone.now
+      results = yield
+      results[:elapsed_time] = Time.zone.now - beginning_time
+      results
+    end
+
     def do_each_block(array, block_size, whole_callback_name, block_callback_name)
       whole_callback_before,
       whole_callback_after,
