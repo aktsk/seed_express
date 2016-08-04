@@ -129,6 +129,8 @@ module SeedExpress
       end
     end
 
+    private
+
     def import_parts(results)
       self.parts.each.with_index(1) do |part, i|
         next unless part.updated?
