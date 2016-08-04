@@ -100,11 +100,7 @@ module SeedExpress
 
         # パート毎に処理する
         r = {}
-        self.parts.each.with_index(1) do |part, i|
-          next unless part.updated?
-          out_results = SeedExpress::Part.new(part, converters, callbacks, i, parts.size).import
-          mix_results!(r, out_results)
-        end
+        import_parts(r)
         next {:result => :skipped} unless r[:parts_updated]
 
         # 処理後の Validation
@@ -130,6 +126,14 @@ module SeedExpress
           :actual_updated_count => r[:actual_updated_ids].size,
           :deleted_count        => r[:deleted_ids].size,
         }
+      end
+    end
+
+    def import_parts(results)
+      self.parts.each.with_index(1) do |part, i|
+        next unless part.updated?
+        out_results = SeedExpress::Part.new(part, converters, callbacks, i, parts.size).import
+        mix_results!(results, out_results)
       end
     end
 
