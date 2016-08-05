@@ -24,26 +24,30 @@ class SeedRecord < ActiveRecord::Base
     private
 
     def update_digests!(updated_ids, new_digests)
-      inserting_records = []
+      results = {:inserting_records => []}
       existing_digests = self.all.index_by(&:record_id)
       do_each_block(updated_ids, BLOCK_SIZE,
                     :updating_digests, :updating_a_part_of_digests) do |targets|
-        updating_records = []
+        results[:updating_records] = []
         targets.each do |id|
-          seed_record = existing_digests[id]
-          if seed_record
-            seed_record.digest = new_digests[id]
-            updating_records << seed_record
-          else
-            inserting_records <<
-              self.new(:record_id => id, :digest => new_digests[id])
-          end
+          make_updating_records!(id, existing_digests, new_digests, results)
         end
 
-        bulk_update_digests!(updating_records)
+        bulk_update_digests!(results[:updating_records])
       end
 
-      inserting_records
+      results[:inserting_records]
+    end
+
+    def make_updating_records!(target_id, existing_digests, new_digests, results)
+      seed_record = existing_digests[target_id]
+      if seed_record
+        seed_record.digest = new_digests[target_id]
+        results[:updating_records] << seed_record
+      else
+        results[:inserting_records] <<
+          self.new(:record_id => target_id, :digest => new_digests[target_id])
+      end
     end
 
     def make_bulk_digest_records(inserted_ids, new_digests)
@@ -67,21 +71,30 @@ class SeedRecord < ActiveRecord::Base
 
     def bulk_update_digests!(records)
       return if records.empty?
+      sql = build_update_query(records)
+      ActiveRecord::Base.connection.execute(sql)
+    end
 
-      ids = records.map(&:id).join(',')
-      digests = records.map { |v| "'#{v.digest}'"  }.join(',')
-      updated_at = "'" + Time.zone.now.utc.strftime('%Y-%m-%dT%H:%M:%S') + "'"
+    def update_query_of_ids(records)
+      records.map(&:id).join(',')
+    end
 
-      sql = <<-"EOF"
+    def update_query_of_digests(records)
+      records.map { |v| "'#{v.digest}'"  }.join(',')
+    end
+
+    def build_update_query(records)
+      ids = update_query_of_ids(records)
+      digests = update_query_of_digests(records)
+
+      <<-"EOF"
         UPDATE seed_records
         SET
-          updated_at = #{updated_at},
+          updated_at = '#{Time.zone.now.utc.iso8601}',
           digest = ELT(FIELD(id, #{ids}), #{digests})
         WHERE
           id IN (#{ids})
       EOF
-
-      ActiveRecord::Base.connection.execute(sql)
     end
 
     def delete_digests_out_of!(parts)

@@ -20,17 +20,6 @@ module SeedExpress
       @file_path = path
 
       @filter_proc = options[:filter_proc]
-      default_callback_proc = Proc.new { |*args| }
-      default_callbacks = [:truncating, :disabling_digests,
-                           :reading_data, :deleting,
-                           :inserting, :inserting_a_part,
-                           :updating, :updating_a_part,
-                           :updating_digests, :updating_a_part_of_digests,
-                           :inserting_digests, :inserting_a_part_of_digests,
-                           :making_bulk_digest_records, :making_a_part_of_bulk_digest_records,
-                          ].flat_map do |v|
-        ["before_#{v}", "after_#{v}"].map(&:to_sym)
-      end.map { |v| [v, default_callback_proc ] }.to_h
       @callbacks = default_callbacks.merge(options[:callbacks] || {})
 
       self.truncate_mode = options[:truncate_mode]
@@ -91,62 +80,107 @@ module SeedExpress
     end
 
     def import
-      beginning_time = Time.zone.now
+      with_elapsed_time do
+        if truncate_mode
+          truncate_table
+        elsif force_update_mode
+          disable_digests
+        end
 
-      if truncate_mode
-        truncate_table
-      elsif force_update_mode
-        disable_digests
+        r = {}
+        # パート毎に処理する
+        import_parts(r)
+        next {:result => :skipped} unless r[:parts_updated]
+
+        # 処理後の Validation
+        after_seed_express_validation(r)
+
+        # 処理後の Validation 予約(親テーブルを更新)
+        update_parent_digest_to_validate(r)
+
+        # ダイジェストの更新
+        renew_digests(r, has_an_error?(r))
+
+        format_results(r)
+      end
+    end
+
+    private
+
+    def default_callbacks
+      default_callback_proc = Proc.new do |*args|
+        # Do nothing
       end
 
-      # パート毎に処理する
-      r = {}
+      [:truncating, :disabling_digests,
+       :reading_data, :deleting,
+       :inserting, :inserting_a_part,
+       :updating, :updating_a_part,
+       :updating_digests, :updating_a_part_of_digests,
+       :inserting_digests, :inserting_a_part_of_digests,
+       :making_bulk_digest_records, :making_a_part_of_bulk_digest_records,
+      ].flat_map do |v|
+        ["before_#{v}", "after_#{v}"].map(&:to_sym)
+      end.map { |v| [v, default_callback_proc ] }.to_h
+    end
+
+    def import_parts(results)
       self.parts.each.with_index(1) do |part, i|
         next unless part.updated?
         out_results = SeedExpress::Part.new(part, converters, callbacks, i, parts.size).import
-        mix_results!(r, out_results)
+        mix_results!(results, out_results)
       end
-
-      return {:result => :skipped, :elapsed_time => Time.zone.now - beginning_time} unless r[:parts_updated]
-
-      # 処理後の Validation
-      after_seed_express_error = after_seed_express_validation(r)
-
-      # 処理後の Validation 予約(親テーブルを更新)
-      update_parent_digest_to_validate(r)
-
-      has_an_error = r[:inserted_error] || r[:updated_error] || after_seed_express_error
-      unless has_an_error
-        ActiveRecord::Base.transaction do
-          seed_table.seed_records.renew_digests!(self, r[:inserted_ids], r[:updated_ids], r[:digests])
-          self.parts.renew_digests!
-        end
-      end
-
-      result = has_an_error ? :error : :result
-      elapsed_time = Time.zone.now - beginning_time
-
-      return {
-        :result               => result,
-        :inserted_count       => r[:inserted_ids].size,
-        :updated_count        => r[:updated_ids].size,
-        :actual_updated_count => r[:actual_updated_ids].size,
-        :deleted_count        => r[:deleted_ids].size,
-        :elapsed_time         => elapsed_time,
-      }
     end
 
     def after_seed_express_validation(args)
       return false unless target_model.respond_to?(:after_seed_express_validation)
 
       errors, = target_model.after_seed_express_validation(args)
-      if errors.present?
-        STDOUT.puts
-        STDOUT.puts errors.pretty_inspect
-        true
-      else
-        false
+      error = if errors.present?
+                STDOUT.puts
+                STDOUT.puts errors.pretty_inspect
+                true
+              else
+                false
+              end
+
+      args[:after_seed_express_error] = error
+    end
+
+    def renew_digests(r, has_an_error)
+      return if has_an_error
+      ActiveRecord::Base.transaction do
+        seed_table.seed_records.renew_digests!(self, r[:inserted_ids], r[:updated_ids], r[:digests])
+        self.parts.renew_digests!
       end
+    end
+
+    def has_an_error?(results)
+      results[:inserted_error] || results[:updated_error] || results[:after_seed_express_error]
+    end
+
+    def format_results(results)
+      {
+        :result               => has_an_error?(results) ? :error : :result,
+        :inserted_count       => results[:inserted_ids].size,
+        :updated_count        => results[:updated_ids].size,
+        :actual_updated_count => results[:actual_updated_ids].size,
+        :deleted_count        => results[:deleted_ids].size,
+      }
+    end
+
+    def update_parent_digest_to_validate(args)
+      return unless self.parent_validation
+      parent_table = self.parent_validation
+      parent_table_model = self.class.table_to_klasses[parent_table]
+      SeedTable.get_record(parent_table_model).disable_record_digests(parent_ids(args))
+    end
+
+    def parent_ids(args)
+      parent_table = self.parent_validation
+      parent_id_column = (parent_table.to_s.singularize + "_id").to_sym
+      target_model.unscoped.where(:id => args[:inserted_ids] + args[:updated_ids]).
+        group(parent_id_column).pluck(parent_id_column)
     end
 
     class << self
@@ -161,20 +195,6 @@ module SeedExpress
           map { |klass| [klass.table_name.to_sym, klass] }.to_h
       end
       memoize :table_to_klasses
-    end
-
-    private
-
-    def update_parent_digest_to_validate(args)
-      return unless self.parent_validation
-      parent_table = self.parent_validation
-      parent_id_column = (parent_table.to_s.singularize + "_id").to_sym
-
-      parent_ids = target_model.unscoped.where(:id => args[:inserted_ids] + args[:updated_ids]).
-        group(parent_id_column).pluck(parent_id_column)
-
-      parent_table_model = self.class.table_to_klasses[parent_table]
-      SeedTable.get_record(parent_table_model).disable_record_digests(parent_ids)
     end
   end
 end
