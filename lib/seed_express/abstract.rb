@@ -163,6 +163,18 @@ module SeedExpress
       }
     end
 
+    def update_parent_digest_to_validate(args)
+      return unless self.parent_validation
+      parent_table = self.parent_validation
+      parent_id_column = (parent_table.to_s.singularize + "_id").to_sym
+
+      parent_ids = target_model.unscoped.where(:id => args[:inserted_ids] + args[:updated_ids]).
+        group(parent_id_column).pluck(parent_id_column)
+
+      parent_table_model = self.class.table_to_klasses[parent_table]
+      SeedTable.get_record(parent_table_model).disable_record_digests(parent_ids)
+    end
+
     class << self
       extend Memoist
 
@@ -175,20 +187,6 @@ module SeedExpress
           map { |klass| [klass.table_name.to_sym, klass] }.to_h
       end
       memoize :table_to_klasses
-    end
-
-    private
-
-    def update_parent_digest_to_validate(args)
-      return unless self.parent_validation
-      parent_table = self.parent_validation
-      parent_id_column = (parent_table.to_s.singularize + "_id").to_sym
-
-      parent_ids = target_model.unscoped.where(:id => args[:inserted_ids] + args[:updated_ids]).
-        group(parent_id_column).pluck(parent_id_column)
-
-      parent_table_model = self.class.table_to_klasses[parent_table]
-      SeedTable.get_record(parent_table_model).disable_record_digests(parent_ids)
     end
   end
 end
