@@ -20,17 +20,6 @@ module SeedExpress
       @file_path = path
 
       @filter_proc = options[:filter_proc]
-      default_callback_proc = Proc.new { |*args| }
-      default_callbacks = [:truncating, :disabling_digests,
-                           :reading_data, :deleting,
-                           :inserting, :inserting_a_part,
-                           :updating, :updating_a_part,
-                           :updating_digests, :updating_a_part_of_digests,
-                           :inserting_digests, :inserting_a_part_of_digests,
-                           :making_bulk_digest_records, :making_a_part_of_bulk_digest_records,
-                          ].flat_map do |v|
-        ["before_#{v}", "after_#{v}"].map(&:to_sym)
-      end.map { |v| [v, default_callback_proc ] }.to_h
       @callbacks = default_callbacks.merge(options[:callbacks] || {})
 
       self.truncate_mode = options[:truncate_mode]
@@ -117,6 +106,23 @@ module SeedExpress
     end
 
     private
+
+    def default_callbacks
+      default_callback_proc = Proc.new do |*args|
+        # Do nothing
+      end
+
+      [:truncating, :disabling_digests,
+       :reading_data, :deleting,
+       :inserting, :inserting_a_part,
+       :updating, :updating_a_part,
+       :updating_digests, :updating_a_part_of_digests,
+       :inserting_digests, :inserting_a_part_of_digests,
+       :making_bulk_digest_records, :making_a_part_of_bulk_digest_records,
+      ].flat_map do |v|
+        ["before_#{v}", "after_#{v}"].map(&:to_sym)
+      end.map { |v| [v, default_callback_proc ] }.to_h
+    end
 
     def import_parts(results)
       self.parts.each.with_index(1) do |part, i|
