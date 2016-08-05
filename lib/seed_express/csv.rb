@@ -21,10 +21,10 @@ module SeedExpress
     def read_values_from(data)
       callbacks[:before_reading_data].call
       csv_rows = csv_values_with_header_from(data)
-      headers = csv_rows.shift.map(&:to_sym)
+      header = csv_header(csv_rows)
 
       whole_values = csv_rows.map do |row|
-        headers.zip(row).to_h
+        header.zip(row).to_h
       end.map do |record|
         setup_each_record(record)
       end.compact
@@ -75,6 +75,10 @@ module SeedExpress
 
       record = @filter_proc.call(record) if @filter_proc
       record
+    end
+
+    def csv_header(csv_rows)
+      csv_rows.shift.map(&:to_sym)
     end
   end
 end
