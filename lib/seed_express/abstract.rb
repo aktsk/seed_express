@@ -166,13 +166,15 @@ module SeedExpress
     def update_parent_digest_to_validate(args)
       return unless self.parent_validation
       parent_table = self.parent_validation
-      parent_id_column = (parent_table.to_s.singularize + "_id").to_sym
-
-      parent_ids = target_model.unscoped.where(:id => args[:inserted_ids] + args[:updated_ids]).
-        group(parent_id_column).pluck(parent_id_column)
-
       parent_table_model = self.class.table_to_klasses[parent_table]
-      SeedTable.get_record(parent_table_model).disable_record_digests(parent_ids)
+      SeedTable.get_record(parent_table_model).disable_record_digests(parent_ids(args))
+    end
+
+    def parent_ids(args)
+      parent_table = self.parent_validation
+      parent_id_column = (parent_table.to_s.singularize + "_id").to_sym
+      target_model.unscoped.where(:id => args[:inserted_ids] + args[:updated_ids]).
+        group(parent_id_column).pluck(parent_id_column)
     end
 
     class << self
