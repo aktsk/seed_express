@@ -30,7 +30,7 @@ module SeedExpress
     end
 
     def target_model
-      unless v = self.class.table_to_klasses[@table_name]
+      unless v = ModelClass.from_table(@table_name)
         raise "#{@table_name} isn't able to convert to a class object"
       end
       v
@@ -172,7 +172,7 @@ module SeedExpress
     def update_parent_digest_to_validate(args)
       return unless self.parent_validation
       parent_table = self.parent_validation
-      parent_table_model = self.class.table_to_klasses[parent_table]
+      parent_table_model = ModelClass.from_table(parent_table)
       SeedTable.get_record(parent_table_model).disable_record_digests(parent_ids(args))
     end
 
@@ -181,20 +181,6 @@ module SeedExpress
       parent_id_column = (parent_table.to_s.singularize + "_id").to_sym
       target_model.unscoped.where(:id => args[:inserted_ids] + args[:updated_ids]).
         group(parent_id_column).pluck(parent_id_column)
-    end
-
-    class << self
-      extend Memoist
-
-      def table_to_klasses
-        # Enables full of models
-        Find.find("#{Rails.root}/app/models") { |f| require f if /\.rb$/ === f }
-
-        table_to_klasses = ActiveRecord::Base.subclasses.
-          select { |klass| klass.respond_to?(:table_name) }.
-          map { |klass| [klass.table_name.to_sym, klass] }.to_h
-      end
-      memoize :table_to_klasses
     end
   end
 end
