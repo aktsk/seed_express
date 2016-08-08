@@ -191,20 +191,9 @@ module SeedExpress
     end
 
     def delete_waste_seed_records
-      seed_table = seed_part.seed_table
       range_of_ids = seed_part.record_id_from .. seed_part.record_id_to
-
       master_record_ids = target_model.unscoped.where(:id => range_of_ids).pluck(:id)
-
-      seed_record_ids = SeedRecord.
-        by_seed_table_id(seed_table.id).
-        by_record_id(range_of_ids).
-        pluck(:record_id)
-
-      waste_record_ids = seed_record_ids - master_record_ids
-      SeedRecord.
-        by_seed_table_id(seed_table.id).
-        by_record_id(waste_record_ids).delete_all
+      SeedRecord.delete_waste_digests!(seed_table, range_of_ids, master_record_ids)
     end
 
     if  Gem::Version.new(ActiveRecord::VERSION) < Gem::Version.new("3.2.0")
