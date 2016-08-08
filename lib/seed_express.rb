@@ -15,6 +15,7 @@ module SeedExpress
   autoload :File,       'seed_express/file'
   autoload :Supporters, 'seed_express/supporters'
   autoload :Utilities,  'seed_express/utilities'
+  autoload :ModelClass, 'seed_express/model_class'
   autoload :CSV,        'seed_express/csv'
   autoload :RubyHash,   'seed_express/ruby_hash'
 end
