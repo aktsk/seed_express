@@ -207,13 +207,14 @@ module SeedExpress
         by_record_id(waste_record_ids).delete_all
     end
 
-    def get_errors(errors)
-      ar_v = ActiveRecord::VERSION
-      if ([ar_v::MAJOR, ar_v::MINOR] <=> [3, 2]) < 0
-        # for older than ActiveRecord 3.2
+    if  Gem::Version.new(ActiveRecord::VERSION) < Gem::Version.new("3.2.0")
+      # for older than ActiveRecord 3.2
+      def get_errors(errors)
         errors
-      else
-        # for equal or newer than ActiveRecord 3.2
+      end
+    else
+      # for equal or newer than ActiveRecord 3.2
+      def get_errors(errors)
         errors.messages
       end
     end
