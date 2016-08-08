@@ -13,6 +13,16 @@ class SeedRecord < ActiveRecord::Base
   class << self
     include SeedExpress::Utilities
 
+    def delete_waste_digests!(seed_table, range_of_ids, master_record_ids)
+      seed_record_ids =
+        self.by_seed_table_id(seed_table.id).
+        by_record_id(range_of_ids).
+        pluck(:record_id)
+
+      waste_record_ids = seed_record_ids - master_record_ids
+      SeedRecord.by_seed_table_id(seed_table.id).by_record_id(waste_record_ids).delete_all
+    end
+
     def renew_digests!(seed_express, inserted_ids, updated_ids, new_digests)
       @@callbacks = seed_express.callbacks
       pending_records = update_digests!(updated_ids, new_digests)

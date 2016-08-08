@@ -191,29 +191,19 @@ module SeedExpress
     end
 
     def delete_waste_seed_records
-      seed_table = seed_part.seed_table
       range_of_ids = seed_part.record_id_from .. seed_part.record_id_to
-
       master_record_ids = target_model.unscoped.where(:id => range_of_ids).pluck(:id)
-
-      seed_record_ids = SeedRecord.
-        by_seed_table_id(seed_table.id).
-        by_record_id(range_of_ids).
-        pluck(:record_id)
-
-      waste_record_ids = seed_record_ids - master_record_ids
-      SeedRecord.
-        by_seed_table_id(seed_table.id).
-        by_record_id(waste_record_ids).delete_all
+      SeedRecord.delete_waste_digests!(seed_table, range_of_ids, master_record_ids)
     end
 
-    def get_errors(errors)
-      ar_v = ActiveRecord::VERSION
-      if ([ar_v::MAJOR, ar_v::MINOR] <=> [3, 2]) < 0
-        # for older than ActiveRecord 3.2
+    if  Gem::Version.new(ActiveRecord::VERSION) < Gem::Version.new("3.2.0")
+      # for older than ActiveRecord 3.2
+      def get_errors(errors)
         errors
-      else
-        # for equal or newer than ActiveRecord 3.2
+      end
+    else
+      # for equal or newer than ActiveRecord 3.2
+      def get_errors(errors)
         errors.messages
       end
     end
