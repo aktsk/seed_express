@@ -196,7 +196,7 @@ module SeedExpress
       SeedRecord.delete_waste_digests!(seed_table, range_of_ids, master_record_ids)
     end
 
-    if  Gem::Version.new(ActiveRecord::VERSION) < Gem::Version.new("3.2.0")
+    if  Gem::Version.new(ActiveRecord::VERSION::STRING) < Gem::Version.new("3.2.0")
       # for older than ActiveRecord 3.2
       def get_errors(errors)
         errors
