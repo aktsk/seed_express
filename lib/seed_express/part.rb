@@ -92,18 +92,10 @@ module SeedExpress
     end
 
     def insert_records(records)
-      existing_record_count = count_full_records
       results = {:inserted_ids => []}
-
       do_each_block(records, BLOCK_SIZE, :inserting, :inserting_a_part) do |targets|
         mix_results!(results, insert_a_block_of_records(targets))
       end
-
-      current_record_count = count_full_records
-      if current_record_count != existing_record_count + records.size
-        raise "Inserting error has been detected. Maybe it's caused by duplicated key on not ID column. Try truncate mode."
-      end
-
       results
     end
 
@@ -125,9 +117,25 @@ module SeedExpress
           nil
         end
       end.compact
-
       target_model.import(bulk_records)
+      error |= detect_an_error_of_bulk_import(inserted_ids)
+
       return :inserted_ids => inserted_ids, :error => error
+    end
+
+    def detect_an_error_of_bulk_import(inserted_ids)
+      actual_inserted_ids = ActiveRecord::Base.transaction do
+        target_model.where(:id => inserted_ids).pluck(:id)
+      end
+
+      lacking_ids = inserted_ids - actual_inserted_ids
+      return false if lacking_ids.blank?
+
+      ids_string = lacking_ids.join(', ')
+      STDOUT.puts
+      STDOUT.puts "Inserting error has been detected caused by ID: #{ids_string}. Maybe it's duplicated keys on not ID column. Fix it, and then run with truncate mode."
+
+      true
     end
 
     def update_records(records)
@@ -196,10 +204,6 @@ module SeedExpress
       STDOUT.puts
       STDOUT.puts "When id is #{record.id}: "
       STDOUT.print get_errors(record.errors).pretty_inspect
-    end
-
-    def count_full_records
-      ActiveRecord::Base.transaction { target_model.unscoped.count }  # To read certainly from master server
     end
   end
 end
