@@ -22,6 +22,7 @@ module SeedExpress
     def values
       rows = self.reader.read_values_from(data)
       validate_range_of_ids(rows)
+      validate_duplicated_ids(rows)
       rows
     end
     memoize :values
@@ -39,6 +40,19 @@ module SeedExpress
         next if allowed_range.cover?(row[:id])
         raise "#{@file_info.file_path} contains out of range id(#{row[:id]})"
       end
+    end
+
+    def validate_duplicated_ids(rows)
+      duplicated_ids = Hash.new(0)
+      rows.each do |value|
+        duplicated_ids[value[:id]] += 1
+      end
+      duplicated_ids.delete_if do |k, v|
+        v == 1
+      end
+
+      return if duplicated_ids.blank?
+      raise "There are dupilcated ids. ({id=>num}: #{duplicated_ids.inspect})"
     end
   end
 end
