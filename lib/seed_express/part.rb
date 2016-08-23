@@ -26,9 +26,6 @@ module SeedExpress
     def import
       return unless seed_part.updated?
 
-      # ID 重複を検出
-      detect_duplicated_ids
-
       # 削除されるレコードを削除
       deleted_ids = delete_missing_data
 
@@ -92,19 +89,6 @@ module SeedExpress
       end
 
       return inserting_records, updating_records, digests
-    end
-
-    def detect_duplicated_ids
-      duplicated_ids = Hash.new(0)
-      seed_part.values.each do |value|
-        duplicated_ids[value[:id]] += 1
-      end
-      duplicated_ids.delete_if do |k, v|
-        v == 1
-      end
-
-      return duplicated_ids.blank?
-      raise "There are dupilcated ids. ({id=>num}: #{duplicated_ids.inspect})"
     end
 
     def insert_records(records)
