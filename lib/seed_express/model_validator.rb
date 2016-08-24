@@ -26,6 +26,8 @@ module SeedExpress
         end.map(&:name).map(&:to_sym)
       end
 
+      private
+
       def not_null_without_default_column?(column)
         !column.primary && !column.null && column.default.nil?
       end
