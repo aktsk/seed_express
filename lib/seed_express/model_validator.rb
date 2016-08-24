@@ -5,6 +5,7 @@ module SeedExpress
         klass.extend ClassMethods
         klass.class_eval do
           validate :validation_for_not_null_without_default
+          validate :validation_for_oversize_string
         end
       end
     end
@@ -17,6 +18,16 @@ module SeedExpress
       end
     end
 
+    def validation_for_oversize_string
+      target_columns = self.class.string_columns
+      target_columns.each_pair do |column, limit|
+        v = self[column]
+        next if v.nil?
+        next if v.size <= limit
+        self.errors[column] << "It is #{v.size} letters. It must be less or equal than #{limit} letters"
+      end
+    end
+
     module ClassMethods
       extend Memoist
 
@@ -26,6 +37,15 @@ module SeedExpress
         end.map(&:name).map(&:to_sym)
       end
       memoize :not_null_without_default_columns
+
+      def string_columns
+        self.columns.select do |v|
+          v.type == :string
+        end.map do |v|
+          [v.name.to_sym, v.limit]
+        end.to_h
+      end
+      memoize :string_columns
 
       private
 
