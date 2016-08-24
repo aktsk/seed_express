@@ -33,6 +33,7 @@ module SeedExpress
       unless v = ModelClass.from_table(@table_name)
         raise "#{@table_name} isn't able to convert to a class object"
       end
+      v.class_eval { include SeedExpress::ModelValidator }
       v
     end
     memoize :target_model
