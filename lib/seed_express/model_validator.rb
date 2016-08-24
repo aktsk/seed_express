@@ -25,6 +25,7 @@ module SeedExpress
           not_null_without_default_column?(v)
         end.map(&:name).map(&:to_sym)
       end
+      memoize :not_null_without_default_columns
 
       private
 
