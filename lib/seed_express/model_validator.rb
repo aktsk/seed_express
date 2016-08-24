@@ -1,6 +1,15 @@
 module SeedExpress
   module ModelValidator
-    def validation_which_not_null_without_default
+    class << self
+      def included(klass)
+        klass.extend ClassMethods
+        klass.class_eval do
+          validate :validation_for_not_null_without_default
+        end
+      end
+    end
+
+    def validation_for_not_null_without_default
       target_columns = self.class.not_null_without_default_columns
       target_columns.each do |column|
         next unless self[column].nil?
@@ -16,18 +25,12 @@ module SeedExpress
           not_null_without_default_column?(v)
         end.map(&:name).map(&:to_sym)
       end
+      memoize :not_null_without_default_columns
+
+      private
 
       def not_null_without_default_column?(column)
         !column.primary && !column.null && column.default.nil?
-      end
-    end
-
-    class << self
-      def included(klass)
-        klass.extend ClassMethods
-        klass.class_eval do
-          validate :validation_which_not_null_without_default
-        end
       end
     end
   end
