@@ -136,6 +136,7 @@ module SeedExpress
     def after_seed_express_validation(args)
       return false unless target_model.respond_to?(:after_seed_express_validation)
 
+      callbacks[:before_later_seed_express_import].call
       errors, = target_model.after_seed_express_validation(args)
       error = if errors.present?
                 STDOUT.puts
@@ -144,7 +145,7 @@ module SeedExpress
               else
                 false
               end
-
+      callbacks[:before_later_seed_express_import].call
       args[:after_seed_express_error] = error
     end
 
