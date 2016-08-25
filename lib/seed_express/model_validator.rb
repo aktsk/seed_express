@@ -36,8 +36,11 @@ module SeedExpress
       def not_null_without_default_columns
         self.columns.select do |v|
           not_null_without_default_column?(v)
-        end.map(&:name).map(&:to_sym).
-          reject { |v| MAGIC_FIELD_NAMES.include?(v) }
+        end.map do |v|
+          symbol = v.name.to_sym
+          next if MAGIC_FIELD_NAMES.include?(symbol)
+          symbol
+        end.compact
       end
       memoize :not_null_without_default_columns
 
