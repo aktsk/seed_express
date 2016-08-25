@@ -31,10 +31,13 @@ module SeedExpress
     module ClassMethods
       extend Memoist
 
+      MAGIC_FIELD_NAMES = [:created_at, :created_on, :updated_at, :updated_on]
+
       def not_null_without_default_columns
         self.columns.select do |v|
           not_null_without_default_column?(v)
-        end.map(&:name).map(&:to_sym)
+        end.map(&:name).map(&:to_sym).
+          reject { |v| MAGIC_FIELD_NAMES.include?(v) }
       end
       memoize :not_null_without_default_columns
 
