@@ -91,7 +91,9 @@ class SeedPart < ActiveRecord::Base
       end.compact.to_h
 
       return nil if files.blank?
-      sort_by_id_range(files)
+      sorted_files = sort_by_id_range(files)
+      validate_ranges(sorted_files.keys)
+      sorted_files
     end
 
     def files(reader)
@@ -124,6 +126,15 @@ class SeedPart < ActiveRecord::Base
       part_files.keys.sort_by(&:min).map do |k|
         [k, part_files[k]]
       end.to_h
+    end
+
+    def validate_ranges(ranges)
+      ranges.each_cons(2) do |small_range, big_range|
+        if small_range.max >= big_range.min
+          raise "id:(%d .. %d) and id:(%d .. %d) are overlapped" %
+            [small_range.min, small_range.max, big_range.min, big_range.max]
+        end
+      end
     end
   end
 end
