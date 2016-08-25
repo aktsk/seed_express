@@ -81,15 +81,7 @@ class SeedPart < ActiveRecord::Base
     end
 
     def part_files(reader)
-      table_name = reader.table_name.to_s
-      suffix = reader.class::FILE_SUFFIX
-      pattern_for_glob = "#{reader.file_path}/**/#{reader.table_name}.*-*.#{suffix}"
-      pattern_for_regexp = %r!/#{table_name}\.([0-9]+)-([0-9]+)\.([^.]*\.)?#{suffix}$!i
-
-      files = Dir.glob(pattern_for_glob).map do |file|
-        each_part_file(file, pattern_for_regexp)
-      end.compact.to_h
-
+      files = get_part_files(reader)
       return nil if files.blank?
       sorted_files = sort_by_id_range(files)
       validate_ranges(sorted_files.keys)
@@ -110,6 +102,17 @@ class SeedPart < ActiveRecord::Base
     end
 
     private
+
+    def get_part_files(reader)
+      table_name = reader.table_name.to_s
+      suffix = reader.class::FILE_SUFFIX
+      pattern_for_glob = "#{reader.file_path}/**/#{reader.table_name}.*-*.#{suffix}"
+      pattern_for_regexp = %r!/#{table_name}\.([0-9]+)-([0-9]+)\.([^.]*\.)?#{suffix}$!i
+
+      Dir.glob(pattern_for_glob).map do |file|
+        each_part_file(file, pattern_for_regexp)
+      end.compact.to_h
+    end
 
     def each_part_file(file, pattern_for_regexp)
       return nil unless pattern_for_regexp === file
