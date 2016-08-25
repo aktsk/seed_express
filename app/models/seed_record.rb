@@ -9,7 +9,9 @@ class SeedRecord < ActiveRecord::Base
     where("NOT (#{in_range})")
   }
 
+  DATETIME_FORMAT_IN_STRING = '%Y-%m-%d %H:%M:%S'
   BLOCK_SIZE = 5000
+
   class << self
     include SeedExpress::Utilities
 
@@ -96,11 +98,12 @@ class SeedRecord < ActiveRecord::Base
     def build_update_query(records)
       ids = update_query_of_ids(records)
       digests = update_query_of_digests(records)
+      updated_at = Time.zone.now.utc.strftime(DATETIME_FORMAT_IN_STRING)
 
       <<-"EOF"
         UPDATE seed_records
         SET
-          updated_at = '#{Time.zone.now.utc.iso8601}',
+          updated_at = '#{updated_at}',
           digest = ELT(FIELD(id, #{ids}), #{digests})
         WHERE
           id IN (#{ids})
