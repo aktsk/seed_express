@@ -20,4 +20,5 @@ module SeedExpress
   autoload :ModelClass,     'seed_express/model_class'
   autoload :CSV,            'seed_express/csv'
   autoload :RubyHash,       'seed_express/ruby_hash'
+  autoload :YAML,           'seed_express/yaml'
 end
