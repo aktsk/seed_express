@@ -125,7 +125,7 @@ module SeedExpress
 
     def detect_an_error_of_bulk_import(inserted_ids)
       actual_inserted_ids = ActiveRecord::Base.transaction do
-        target_model.where(:id => inserted_ids).pluck(:id)
+        target_model.unscoped.where(:id => inserted_ids).pluck(:id)
       end
 
       lacking_ids = inserted_ids - actual_inserted_ids
