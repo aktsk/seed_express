@@ -248,8 +248,5 @@ end
 ```
 
 ## TODO
-* mysql の @@sql_mode に一時的に STRICT_ALL_TABLES を設定して動作するようにする。
-  * Integer 型カラムで NULL 不許可でデフォルトが無いのに勝手に 0 が設定されるのはおかしい。
-  * Varchar 型カラムで制約よりも長い値を設定すると、勝手に削られて登録されるのはおかしい。
 * SeedExpress::CSV や SeedExpress::RbHash の部分にブロックで任意の形式のデータを読み込み可能にする。
   * わざわざ gem をアップデートしなくても、任意型式に対応したい。
