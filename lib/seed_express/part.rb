@@ -212,5 +212,7 @@ module SeedExpress
         false
       end
     end
+    memoize :target_columns
+
   end
 end
