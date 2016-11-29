@@ -102,22 +102,19 @@ module SeedExpress
     def insert_a_block_of_records(records)
       error = false
       inserted_ids = []
-      bulk_records = records.map do |attributes|
-        record = target_model.new
-        attributes.each_pair do |column, value|
-          record[column] = converters.convert_value(column, value)
-        end
-
-        if record.valid?
-          inserted_ids << attributes[:id]
-          record
+      bulk_models = records.map do |record|
+        model = target_model.new
+        set_value_into_model!(record, model)
+        if model.valid?
+          inserted_ids << record[:id]
+          model
         else
-          show_each_validation_error(record)
+          show_each_validation_error(model)
           error = true
           nil
         end
       end.compact
-      target_model.import(bulk_records)
+      target_model.import(bulk_models)
       error |= detect_an_error_of_bulk_import(inserted_ids)
 
       return :inserted_ids => inserted_ids, :error => error
@@ -167,9 +164,7 @@ module SeedExpress
     def update_a_record!(record, existing_records, results)
       id = record[:id]
       model = existing_records[id]
-      record.each_pair do |column, value|
-        model[column] = converters.convert_value(column, value)
-      end
+      set_value_into_model!(record, model)
       if model.changed?
         if model.valid?
           model.save!
@@ -204,6 +199,20 @@ module SeedExpress
       STDOUT.puts
       STDOUT.puts "When id is #{record.id}: "
       STDOUT.print get_errors(record.errors).pretty_inspect
+    end
+
+    def target_columns
+      target_model.column_names.map(&:to_sym).reject do |v|
+        next true if v == :created_at || v == :updated_at
+        false
+      end
+    end
+    memoize :target_columns
+
+    def set_value_into_model!(record, model)
+      target_columns.each do |column|
+        model[column] = converters.convert_value(column, record[column])
+      end
     end
   end
 end
