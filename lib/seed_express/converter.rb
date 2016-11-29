@@ -17,11 +17,13 @@ module SeedExpress
     attr_reader :target_model
     attr_reader :nvl_mode
     attr_reader :datetime_offset
+    attr_reader :user_defined_conversions
 
     def initialize(target_model, options)
       @target_model = target_model
       @nvl_mode = !!options[:nvl_mode]
       @datetime_offset = options[:datetime_offset]
+      @user_defined_conversions = options[:user_defined_conversions]
     end
 
     def convert_value(column, value)
@@ -29,7 +31,8 @@ module SeedExpress
         return defaults_on_db[column] if defaults_on_db.has_key?(column)
         return nvl(column, value)
       end
-      conversion = DEFAULT_CONVERSIONS[columns[column].type]
+
+      conversion = conversions[columns[column].type]
       return value unless conversion
       conversion.call(self, value)
     end
@@ -38,6 +41,11 @@ module SeedExpress
       return nil unless nvl_mode
       nvl_columns[column]
     end
+
+    def conversions
+      DEFAULT_CONVERSIONS.merge(user_defined_conversions)
+    end
+    memoize :conversions
 
     private
 
