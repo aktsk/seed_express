@@ -9,6 +9,7 @@ module SeedExpress
     attr_accessor :datetime_offset
     attr_accessor :callbacks
     attr_accessor :parent_validation
+    attr_accessor :user_defined_conversions
     attr_reader   :file_path
 
     include SeedExpress::Utilities
@@ -27,6 +28,7 @@ module SeedExpress
       self.nvl_mode = options[:nvl_mode]
       self.datetime_offset = options[:datetime_offset] || 0
       self.parent_validation = options[:parent_validation]
+      self.user_defined_conversions = options[:user_defined_conversions] || {}
     end
 
     def target_model
@@ -52,8 +54,9 @@ module SeedExpress
 
     def converters
       Converter.new(target_model,
-                    :nvl_mode        => nvl_mode,
-                    :datetime_offset => datetime_offset
+                    :nvl_mode                 => nvl_mode,
+                    :datetime_offset          => datetime_offset,
+                    :user_defined_conversions => user_defined_conversions,
                     )
     end
     memoize :converters
