@@ -205,5 +205,12 @@ module SeedExpress
       STDOUT.puts "When id is #{record.id}: "
       STDOUT.print get_errors(record.errors).pretty_inspect
     end
+
+    def target_columns
+      target_model.column_names.map(&:to_sym).reject do |v|
+        next true if v == :created_at || v == :updated_at
+        false
+      end
+    end
   end
 end
