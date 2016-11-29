@@ -214,5 +214,10 @@ module SeedExpress
     end
     memoize :target_columns
 
+    def set_value_into_model!(record, model)
+      target_columns.each do |column|
+        model[column] = converters.convert_value(column, record[column])
+      end
+    end
   end
 end
