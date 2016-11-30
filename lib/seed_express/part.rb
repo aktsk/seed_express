@@ -210,8 +210,10 @@ module SeedExpress
     memoize :target_columns
 
     def set_value_into_model!(record, model)
-      target_columns.each do |column|
-        model[column] = converters.convert_value(column, record[column])
+      available_columns = target_columns
+      record.each_pair do |column, value|
+        next if available_columns[column]
+        model[k] = converters.convert_value(column, value)
       end
     end
   end
