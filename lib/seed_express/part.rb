@@ -42,6 +42,14 @@ module SeedExpress
       # 不要な digest を削除
       delete_waste_seed_records
 
+      # パート単位の処理後の処理
+      call_later_a_part_of_seed_express(:inserted_records => inserting_records,
+                                        :updated_records  => updating_records,
+                                        :inserted_ids     => insert_results[:inserted_ids],
+                                        :updated_ids      => update_results[:updated_ids],
+                                        :deleted_ids      => deleted_ids,
+                                        :digests          => digests)
+
       return {
         :digests            => digests,
         :deleted_ids        => deleted_ids,
