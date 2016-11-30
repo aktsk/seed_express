@@ -205,13 +205,15 @@ module SeedExpress
       target_model.column_names.map(&:to_sym).reject do |v|
         next true if v == :created_at || v == :updated_at
         false
-      end
+      end.map { |v| [v, true] }.to_h
     end
     memoize :target_columns
 
     def set_value_into_model!(record, model)
-      target_columns.each do |column|
-        model[column] = converters.convert_value(column, record[column])
+      available_columns = target_columns
+      record.each_pair do |column, value|
+        next unless available_columns[column]
+        model[column] = converters.convert_value(column, value)
       end
     end
   end
