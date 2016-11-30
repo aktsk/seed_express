@@ -205,7 +205,7 @@ module SeedExpress
       target_model.column_names.map(&:to_sym).reject do |v|
         next true if v == :created_at || v == :updated_at
         false
-      end
+      end.map { |v| [v, true] }.to_h
     end
     memoize :target_columns
 
