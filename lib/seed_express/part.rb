@@ -96,21 +96,6 @@ module SeedExpress
       return inserting_records, updating_records, digests
     end
 
-    def detect_an_error_of_bulk_import(inserted_ids)
-      actual_inserted_ids = ActiveRecord::Base.transaction do
-        target_model.unscoped.where(:id => inserted_ids).pluck(:id)
-      end
-
-      lacking_ids = inserted_ids - actual_inserted_ids
-      return false if lacking_ids.blank?
-
-      ids_string = lacking_ids.join(', ')
-      STDOUT.puts
-      STDOUT.puts "Inserting error has been detected caused by ID: #{ids_string}. Maybe it's duplicated keys on not ID column. Fix it, and then run with truncate mode."
-
-      true
-    end
-
     if  Gem::Version.new(ActiveRecord::VERSION::STRING) < Gem::Version.new("3.2.0")
       # for older than ActiveRecord 3.2
       def get_errors(errors)
