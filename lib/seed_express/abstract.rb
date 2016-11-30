@@ -48,7 +48,9 @@ module SeedExpress
     memoize :seed_table
 
     def parts
-      seed_table.parts
+      ActiveRecord::Base.transaction do
+        seed_table.parts
+      end
     end
     memoize :parts
 
