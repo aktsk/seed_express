@@ -45,10 +45,11 @@ class SeedPart < ActiveRecord::Base
 
   def existing_digests
     digests = {}
-    records =
+    records = ActiveRecord::Base.transaction do
       SeedRecord.where(:seed_table_id => seed_table.id,
                        :record_id => self.record_id_from .. self.record_id_to).
-      pluck([:record_id, :digest])
+        pluck([:record_id, :digest])
+    end
 
     records.each do |record_id, digest|
       digests[record_id] = digest
