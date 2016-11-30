@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 module SeedExpress
   class Part
+    autoload :Insert, 'seed_express/part/insert'
+    autoload :Update, 'seed_express/part/update'
+    autoload :Delete, 'seed_express/part/delete'
+
     BLOCK_SIZE = 1000
 
     extend Memoist
@@ -13,6 +17,9 @@ module SeedExpress
     attr_reader :converters
 
     include SeedExpress::Utilities
+    include SeedExpress::Part::Insert
+    include SeedExpress::Part::Update
+    include SeedExpress::Part::Delete
 
     def initialize(seed_part, converters, callbacks, part_count, part_total)
       @seed_part = seed_part
@@ -64,16 +71,6 @@ module SeedExpress
 
     private
 
-    def delete_missing_data
-      delete_target_ids = seed_part.existing_ids - seed_part.new_ids
-      callbacks[:before_deleting].call(delete_target_ids.size)
-      if delete_target_ids.present?
-        target_model.unscoped.where(:id => delete_target_ids).delete_all
-      end
-      callbacks[:after_deleting].call(delete_target_ids.size)
-      delete_target_ids
-    end
-
     def categorize_each_types_of_data_to_upload
       inserting_records = []
       updating_records = []
@@ -99,35 +96,6 @@ module SeedExpress
       return inserting_records, updating_records, digests
     end
 
-    def insert_records(records)
-      results = {:inserted_ids => []}
-      do_each_block(records, BLOCK_SIZE, :inserting, :inserting_a_part) do |targets|
-        mix_results!(results, insert_a_block_of_records(targets))
-      end
-      results
-    end
-
-    def insert_a_block_of_records(records)
-      error = false
-      inserted_ids = []
-      bulk_models = records.map do |record|
-        model = target_model.new
-        set_value_into_model!(record, model)
-        if model.valid?
-          inserted_ids << record[:id]
-          model
-        else
-          show_each_validation_error(model)
-          error = true
-          nil
-        end
-      end.compact
-      target_model.import(bulk_models)
-      error |= detect_an_error_of_bulk_import(inserted_ids)
-
-      return :inserted_ids => inserted_ids, :error => error
-    end
-
     def detect_an_error_of_bulk_import(inserted_ids)
       actual_inserted_ids = ActiveRecord::Base.transaction do
         target_model.unscoped.where(:id => inserted_ids).pluck(:id)
@@ -141,54 +109,6 @@ module SeedExpress
       STDOUT.puts "Inserting error has been detected caused by ID: #{ids_string}. Maybe it's duplicated keys on not ID column. Fix it, and then run with truncate mode."
 
       true
-    end
-
-    def update_records(records)
-      results = {:updated_ids => [], :actual_updated_ids => []}
-      do_each_block(records, BLOCK_SIZE,
-                    :updating, :updating_a_part) do |targets|
-        mix_results!(results, update_a_block_of_records(targets))
-      end
-      results
-    end
-
-    def update_a_block_of_records(records)
-      existing_records = existing_records_by_id(records)
-      results = {:updated_ids => [], :actual_updated_ids =>[], :error => false}
-      ActiveRecord::Base.transaction do
-        records.each do |record|
-          update_a_record!(record, existing_records, results)
-        end
-      end
-
-      results
-    end
-
-    def existing_records_by_id(records_from_file)
-      record_ids = records_from_file.map { |target| target[:id] }
-      target_model.unscoped.where(:id => record_ids).index_by(&:id)
-    end
-
-    def update_a_record!(record, existing_records, results)
-      id = record[:id]
-      model = existing_records[id]
-      set_value_into_model!(record, model)
-      if model.changed?
-        if model.valid?
-          model.save!
-          results[:actual_updated_ids] << id
-        else
-          show_each_validation_error(model)
-          results[:error] = true
-        end
-      end
-      results[:updated_ids] << id
-    end
-
-    def delete_waste_seed_records
-      range_of_ids = seed_part.record_id_from .. seed_part.record_id_to
-      master_record_ids = target_model.unscoped.where(:id => range_of_ids).pluck(:id)
-      SeedRecord.delete_waste_digests!(seed_part.seed_table, range_of_ids, master_record_ids)
     end
 
     if  Gem::Version.new(ActiveRecord::VERSION::STRING) < Gem::Version.new("3.2.0")
