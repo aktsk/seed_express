@@ -212,8 +212,8 @@ module SeedExpress
     def set_value_into_model!(record, model)
       available_columns = target_columns
       record.each_pair do |column, value|
-        next if available_columns[column]
-        model[k] = converters.convert_value(column, value)
+        next unless available_columns[column]
+        model[column] = converters.convert_value(column, value)
       end
     end
   end
