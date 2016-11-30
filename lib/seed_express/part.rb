@@ -216,5 +216,18 @@ module SeedExpress
         model[column] = converters.convert_value(column, value)
       end
     end
+
+    def call_later_a_part_of_seed_express(args)
+      return false unless target_model.respond_to?(:later_a_part_of_seed_express)
+
+      callbacks[:before_later_a_part_of_seed_express_import].call(part_count, part_total)
+      errors, = target_model.later_a_part_of_seed_express(args)
+      error = if errors.present?
+                STDOUT.puts
+                STDOUT.puts errors.pretty_inspect
+              end
+
+      callbacks[:after_later_a_part_of_seed_express_import].call(part_count, part_total)
+    end
   end
 end
