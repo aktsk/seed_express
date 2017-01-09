@@ -159,6 +159,7 @@ module SeedExpress
       ActiveRecord::Base.transaction do
         seed_table.seed_records.renew_digests!(self, r[:inserted_ids], r[:updated_ids], r[:digests])
         self.parts.renew_digests!
+        seed_table.renew_digest!
       end
     end
 
