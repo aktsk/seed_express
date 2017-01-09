@@ -13,6 +13,7 @@ module SeedExpress
     attr_reader   :file_path
 
     include SeedExpress::Utilities
+    include SeedExpress::DigestManager
 
     def initialize(table_name, path, options)
       Supporters.regist!
@@ -63,35 +64,13 @@ module SeedExpress
     end
     memoize :converters
 
-    def truncate_table
-      callbacks[:before_truncating].call
-      ActiveRecord::Base.transaction do
-        seed_table.truncate_digests
-      end
-
-      target_model.connection.execute("TRUNCATE TABLE #{@table_name}")
-      callbacks[:after_truncating].call
-    end
-
-    def disable_digests
-      callbacks[:before_disabling_digests].call
-      ActiveRecord::Base.transaction do
-        seed_table.disable_record_digests
-      end
-      callbacks[:before_disabling_digests].call
-    end
-
     def in_records
       raise "Please implements #in_records in each class"
     end
 
     def import
       with_elapsed_time do
-        if truncate_mode
-          truncate_table
-        elsif force_update_mode || seed_table.schema_updated?
-          disable_digests
-        end
+        do_truncate_or_force_update
 
         r = {}
         # パート毎に処理する
@@ -154,15 +133,6 @@ module SeedExpress
       args[:after_seed_express_error] = error
     end
 
-    def renew_digests(r, has_an_error)
-      return if has_an_error
-      ActiveRecord::Base.transaction do
-        seed_table.seed_records.renew_digests!(self, r[:inserted_ids], r[:updated_ids], r[:digests])
-        self.parts.renew_digests!
-        seed_table.renew_digest!
-      end
-    end
-
     def has_an_error?(results)
       results[:inserted_error] || results[:updated_error] || results[:after_seed_express_error]
     end
@@ -175,20 +145,6 @@ module SeedExpress
         :actual_updated_count => results[:actual_updated_ids].size,
         :deleted_count        => results[:deleted_ids].size,
       }
-    end
-
-    def update_parent_digest_to_validate(args)
-      return unless self.parent_validation
-      parent_table = self.parent_validation
-      parent_table_model = ModelClass.from_table(parent_table)
-      SeedTable.get_record(parent_table_model).disable_record_digests(parent_ids(args))
-    end
-
-    def parent_ids(args)
-      parent_table = self.parent_validation
-      parent_id_column = (parent_table.to_s.singularize + "_id").to_sym
-      target_model.unscoped.where(:id => args[:inserted_ids] + args[:updated_ids]).
-        group(parent_id_column).pluck(parent_id_column)
     end
   end
 end
