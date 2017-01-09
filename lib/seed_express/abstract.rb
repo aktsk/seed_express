@@ -89,7 +89,7 @@ module SeedExpress
       with_elapsed_time do
         if truncate_mode
           truncate_table
-        elsif force_update_mode
+        elsif force_update_mode || seed_table.schema_updated?
           disable_digests
         end
 
