@@ -5,6 +5,7 @@ module SeedExpress
       def regist!
         define_to_h
         define_pluck
+        define_schema_digest
       end
 
       private
@@ -33,6 +34,20 @@ module SeedExpress
 
           def pluck_for_a_column(argv)
             self.select(argv).map { |record| record.send(argv) }
+          end
+        end
+      end
+
+      def define_schema_digest
+        ActiveRecord::Base.class_eval do
+          class << self
+            extend Memoist
+
+            def schema_digest
+              hash = self.columns.sort_by { |v| v.name }.map { |v| [v.name, v.sql_type] }.to_h
+              Digest::SHA1.hexdigest(hash.to_msgpack)
+            end
+            memoize :schema_digest
           end
         end
       end
