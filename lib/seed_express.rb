@@ -9,6 +9,7 @@ module SeedExpress
   autoload :Railtie,        'seed_express/railtie'
   Railtie
   autoload :Abstract,       'seed_express/abstract'
+  autoload :DigestManager,  'seed_express/digest_manager'
   autoload :Parts,          'seed_express/parts'
   autoload :Part,           'seed_express/part'
   autoload :Converter,      'seed_express/converter'

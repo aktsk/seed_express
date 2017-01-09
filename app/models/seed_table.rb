@@ -53,6 +53,16 @@ class SeedTable < ActiveRecord::Base
     SeedRecord.by_seed_table_id(self.id).delete_all
   end
 
+  def schema_updated?
+    self.schema_digest != target_model.schema_digest
+  end
+
+  def update_schema_digest!
+    self.schema_digest = target_model.schema_digest
+    self.save!
+  end
+  alias renew_digest! update_schema_digest!
+
   class << self
     def get_record(target_model)
       table_name = target_model.table_name
