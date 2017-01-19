@@ -13,8 +13,22 @@ module SeedExpress
         # Enables full of models
         Find.find("#{Rails.root}/app/models") { |f| require f if /\.rb$/ === f }
 
-        ActiveRecord::Base.subclasses.
-          select { |klass| klass.respond_to?(:table_name) }.
+        get_real_classes = lambda do |models|
+          results = []
+          models.each do |model|
+            if model.abstract_class && model.subclasses.size > 0
+              results += get_real_classes.call(model.subclasses)
+            else
+              results << model
+            end
+          end
+          results
+        end
+
+        not_abstract_classes = get_real_classes.call(ActiveRecord::Base.subclasses)
+
+        not_abstract_classes.
+          select { |klass| !klass.abstract_class && klass.respond_to?(:table_name) }.
           map { |klass| [klass.table_name.to_sym, klass] }.to_h
       end
       memoize :table_to_classes
