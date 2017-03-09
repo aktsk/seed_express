@@ -77,8 +77,8 @@ module SeedExpress
         import_parts(r)
         next {:result => :skipped} unless r[:parts_updated]
 
-        # 処理後の Validation
-        after_seed_express_validation(r)
+        # 処理後の Callback 呼び出し
+        call_later_seed_express(r)
 
         # 処理後の Validation 予約(親テーブルを更新)
         update_parent_digest_to_validate(r)
@@ -117,11 +117,17 @@ module SeedExpress
       end
     end
 
-    def after_seed_express_validation(args)
-      return false unless target_model.respond_to?(:after_seed_express_validation)
+    def call_later_seed_express(args)
+      # for backward compatibility
+      callback_method = if target_model.respond_to?(:later_seed_express)
+                          :later_seed_express
+                        elsif target_model.respond_to?(:after_seed_express_validation)
+                          :after_seed_express_validation
+                        end
+      return false unless callback_method
 
       callbacks[:before_later_seed_express_import].call
-      errors, = target_model.after_seed_express_validation(args)
+      errors, = target_model.send(callback_method, args)
       error = if errors.present?
                 STDOUT.puts
                 STDOUT.puts errors.pretty_inspect
@@ -130,11 +136,11 @@ module SeedExpress
                 false
               end
       callbacks[:before_later_seed_express_import].call
-      args[:after_seed_express_error] = error
+      args[:later_seed_express_error] = error
     end
 
     def has_an_error?(results)
-      results[:inserted_error] || results[:updated_error] || results[:after_seed_express_error]
+      results[:inserted_error] || results[:updated_error] || results[:later_seed_express_error]
     end
 
     def format_results(results)
