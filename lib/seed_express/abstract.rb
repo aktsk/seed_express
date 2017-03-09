@@ -136,11 +136,11 @@ module SeedExpress
                 false
               end
       callbacks[:before_later_seed_express_import].call
-      args[:after_seed_express_error] = error
+      args[:later_seed_express_error] = error
     end
 
     def has_an_error?(results)
-      results[:inserted_error] || results[:updated_error] || results[:after_seed_express_error]
+      results[:inserted_error] || results[:updated_error] || results[:later_seed_express_error]
     end
 
     def format_results(results)
