@@ -118,10 +118,16 @@ module SeedExpress
     end
 
     def after_seed_express_validation(args)
-      return false unless target_model.respond_to?(:after_seed_express_validation)
+      # for backward compatibility
+      callback_method = if target_model.respond_to?(:later_seed_express)
+                          :later_seed_express
+                        elsif target_model.respond_to?(:after_seed_express_validation)
+                          :after_seed_express_validation
+                        end
+      return false unless callback_method
 
       callbacks[:before_later_seed_express_import].call
-      errors, = target_model.after_seed_express_validation(args)
+      errors, = target_model.send(callback_method, args)
       error = if errors.present?
                 STDOUT.puts
                 STDOUT.puts errors.pretty_inspect
