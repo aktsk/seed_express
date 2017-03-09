@@ -77,8 +77,8 @@ module SeedExpress
         import_parts(r)
         next {:result => :skipped} unless r[:parts_updated]
 
-        # 処理後の Validation
-        after_seed_express_validation(r)
+        # 処理後の Callback 呼び出し
+        call_later_seed_express(r)
 
         # 処理後の Validation 予約(親テーブルを更新)
         update_parent_digest_to_validate(r)
@@ -117,7 +117,7 @@ module SeedExpress
       end
     end
 
-    def after_seed_express_validation(args)
+    def call_later_seed_express(args)
       # for backward compatibility
       callback_method = if target_model.respond_to?(:later_seed_express)
                           :later_seed_express
