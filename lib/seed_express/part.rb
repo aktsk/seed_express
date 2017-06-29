@@ -64,7 +64,7 @@ module SeedExpress
         :inserted_error     => insert_results[:error],
         :updated_ids        => update_results[:updated_ids],
         :actual_updated_ids => update_results[:actual_updated_ids],
-        :updated_error      => update_results[:updated_error],
+        :updated_error      => update_results[:error],
         :parts_updated      => true,
       }
     end
