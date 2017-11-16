@@ -50,22 +50,26 @@ module SeedExpress
       delete_waste_seed_records
 
       # パート単位の処理後の処理
-      call_later_a_part_of_seed_express(:inserted_records => inserting_records,
-                                        :updated_records  => updating_records,
-                                        :inserted_ids     => insert_results[:inserted_ids],
-                                        :updated_ids      => update_results[:updated_ids],
-                                        :deleted_ids      => deleted_ids,
-                                        :digests          => digests)
+      error =
+        call_later_a_part_of_seed_express(
+          :inserted_records => inserting_records,
+          :updated_records  => updating_records,
+          :inserted_ids     => insert_results[:inserted_ids],
+          :updated_ids      => update_results[:updated_ids],
+          :deleted_ids      => deleted_ids,
+          :digests          => digests
+        )
 
       return {
-        :digests            => digests,
-        :deleted_ids        => deleted_ids,
-        :inserted_ids       => insert_results[:inserted_ids],
-        :inserted_error     => insert_results[:error],
-        :updated_ids        => update_results[:updated_ids],
-        :actual_updated_ids => update_results[:actual_updated_ids],
-        :updated_error      => update_results[:error],
-        :parts_updated      => true,
+        :digests                            => digests,
+        :deleted_ids                        => deleted_ids,
+        :inserted_ids                       => insert_results[:inserted_ids],
+        :inserted_error                     => insert_results[:error],
+        :updated_ids                        => update_results[:updated_ids],
+        :actual_updated_ids                 => update_results[:actual_updated_ids],
+        :updated_error                      => update_results[:error],
+        :parts_updated                      => true,
+        :later_a_part_of_seed_express_error => error,
       }
     end
 
