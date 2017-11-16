@@ -138,9 +138,13 @@ module SeedExpress
       error = if errors.present?
                 STDOUT.puts
                 STDOUT.puts errors.pretty_inspect
+                true
+              else
+                false
               end
 
       callbacks[:after_later_a_part_of_seed_express_import].call(part_count, part_total)
+      error
     end
   end
 end
