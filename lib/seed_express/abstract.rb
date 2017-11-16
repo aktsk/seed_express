@@ -140,7 +140,10 @@ module SeedExpress
     end
 
     def has_an_error?(results)
-      results[:inserted_error] || results[:updated_error] || results[:later_seed_express_error]
+      results[:inserted_error] ||
+        results[:updated_error] ||
+        results[:later_seed_express_error] ||
+        results[:later_a_part_of_seed_express_error]
     end
 
     def format_results(results)
