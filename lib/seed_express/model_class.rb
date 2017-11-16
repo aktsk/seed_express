@@ -11,7 +11,7 @@ module SeedExpress
 
       def table_to_classes
         # Enables full of models
-        Find.find("#{Rails.root}/app/models") { |f| require f if /\.rb$/ === f }
+        Find.find("#{Rails.root}/app/models") { |f| require_dependency f if /\.rb$/ === f }
 
         get_real_classes = lambda do |models|
           results = []
