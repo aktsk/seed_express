@@ -18,7 +18,7 @@ module SeedExpress
     end
 
     def each(&block)
-      block ? @alive_parts.each(&block) : Enumerator.new(@alive_parts, :each)
+      block ? @alive_parts.each(&block) : @alive_parts.enum_for(:each)
     end
 
     def renew_digests!
