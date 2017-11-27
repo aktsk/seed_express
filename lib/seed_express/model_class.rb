@@ -28,7 +28,7 @@ module SeedExpress
         not_abstract_classes = get_real_classes.call(ActiveRecord::Base.subclasses)
 
         not_abstract_classes.
-          select { |klass| !klass.abstract_class && klass.respond_to?(:table_name) }.
+          select { |klass| !klass.abstract_class? && klass.respond_to?(:table_name) }.
           map { |klass| [klass.table_name.to_sym, klass] }.to_h
       end
       memoize :table_to_classes
