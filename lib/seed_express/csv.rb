@@ -45,11 +45,7 @@ module SeedExpress
             next
           end
 
-          if @filter_each_lines
-            line = @filter_each_lines.call(line)
-          end
-
-          next if line[0] == COMMENT_INITIAL_CHARACTER
+          line = @filter_each_lines.call(line) if @filter_each_lines
           tmp_f.puts line
         end
 
@@ -62,7 +58,9 @@ module SeedExpress
                                         })
       end
 
-      values_with_header
+      values_with_header.delete_if.with_index do |values, i|
+        i > 0 && values[0].to_s[0] == COMMENT_INITIAL_CHARACTER
+      end
     end
 
     def setup_each_record(record)
